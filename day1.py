@@ -1,7 +1,7 @@
 import numpy as np
 import common
 
-text = common.import_file("day1_input")
+text = common.import_file("input/day1_input")
 print(np.sum(np.diff(common.return_int_list(text)) > 0))
 
 ints = common.return_int_list(text)

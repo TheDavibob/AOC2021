@@ -47,7 +47,7 @@ class Position2:
 
 
 if __name__ == "__main__":
-    text = common.import_file("day2_input")
+    text = common.import_file("input/day2_input")
     pos = Position()
     pos.step_all(text)
     print(pos.return_total())
