@@ -3,7 +3,7 @@ import numpy as np
 import common
 
 text = common.import_file('input/day3_input')
-text = common.convert_string_to_np_array(text)
+text = common.convert_string_to_np_array(text, {"0": 0, "1": 1})
 
 
 def from_binary(bool_array):
@@ -38,6 +38,4 @@ def reduce_to_single_value(array, type='oxy'):
 
 o = reduce_to_single_value(text, 'oxy')
 c = reduce_to_single_value(text, 'co2')
-print(from_binary(o))
-print(from_binary(c))
 print(from_binary(o) * from_binary(c))
