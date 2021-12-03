@@ -1,7 +1,35 @@
+from typing import Dict, Optional
+
 import numpy as np
 
 
-def convert_string_to_np_array(input_string: str, mapping_dict: dict=None):
+def convert_string_to_np_array(
+        input_string: str,
+        mapping_dict: Optional[Dict[str, int]]=None):
+    """
+    If we have a string that consists of a regular grid of characters,
+    this is mapped to a numpy array of ints, where all values with the same
+    int representation had the same character representation.
+
+    e.g.
+    .#.         010
+    ###   ->    111
+    #.#         101
+
+    Parameters
+    ----------
+    input_string: str
+        Input text, with rows separated by newline characters
+    mapping_dict: Dict[str, int]
+        Mapping from characters to integers. If not provided, automatically
+        generated starting from 0.
+
+    Returns
+    -------
+    np.ndarray
+        dtype=int
+
+    """
     lines = [line for line in input_string.split('\n') if line != '']
 
     len_line = len(lines[0])
@@ -34,12 +62,53 @@ def convert_string_to_np_array(input_string: str, mapping_dict: dict=None):
     return out_array
 
 
-def return_int_list(string):
+def return_int_list(string: str) -> np.ndarray:
+    """
+    Convert a string, consisting of integers on each row, to a list of ints,
+    cast to a numpy array.
+
+    Parameters
+    ----------
+    string: text list of integers (separated by newlines)
+
+    Returns
+    -------
+    np.ndarray
+
+    """
     return np.array([int(num) for num in string.split('\n') if num != ''])
 
 
-def import_file(filepath):
+def import_file(filepath: str) -> str:
+    """
+    Load a file as a string. New lines are represented by the newline character.
+
+    Parameters
+    ----------
+    filepath: str
+
+    Returns
+    -------
+    text: str
+
+    """
     with open(filepath) as file:
         text = file.read()
 
     return text
+
+
+def from_binary(bool_array: np.ndarray) -> int:
+    """
+    Converts a numpy boolean array (1-d) to an integer
+    e.g. [1, 0, 0, 1] -> 8 + 1 = 9
+
+    Parameters
+    ----------
+    bool_array: np.ndarray, shape=(n,), dtype = bool
+
+    Returns
+    -------
+    int
+    """
+    return np.sum(2**np.arange(len(bool_array))[::-1] * bool_array)
