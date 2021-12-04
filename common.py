@@ -98,7 +98,7 @@ def import_file(filepath: str) -> str:
     return text
 
 
-def from_binary(bool_array: np.ndarray) -> int:
+def from_binary_array(bool_array: np.ndarray) -> int:
     """
     Converts a numpy boolean array (1-d) to an integer
     e.g. [1, 0, 0, 1] -> 8 + 1 = 9

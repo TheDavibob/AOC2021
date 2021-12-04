@@ -8,8 +8,8 @@ text = common.convert_string_to_np_array(text, {"0": 0, "1": 1})
 """
 Part 1
 """
-gamma = common.from_binary(np.sum(text, axis=0) > text.shape[0] / 2)
-epsilon = common.from_binary(np.sum(text, axis=0) < text.shape[0] / 2)
+gamma = common.from_binary_array(np.sum(text, axis=0) > text.shape[0] / 2)
+epsilon = common.from_binary_array(np.sum(text, axis=0) < text.shape[0] / 2)
 
 print(f"Part 1: {gamma * epsilon}")
 
@@ -38,4 +38,4 @@ def reduce_to_single_value(array, type='oxy'):
 
 o = reduce_to_single_value(text, 'oxy')
 c = reduce_to_single_value(text, 'co2')
-print(f"Part 2: {common.from_binary(o) * common.from_binary(c)}")
+print(f"Part 2: {common.from_binary_array(o) * common.from_binary_array(c)}")
