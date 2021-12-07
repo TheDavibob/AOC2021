@@ -21,6 +21,10 @@ def minimise_over_potential_positions(positions, norm):
     return stored_delta
 
 
+def one_line_variation(pos, norm):
+    return np.min(np.sum(norm(pos[:, None] - np.arange(min(pos), max(pos))[None, :]), axis=0))
+
+
 if __name__ == "__main__":
     text = common.import_file('input/day7_input')
     pos = np.array([int(t) for t in text.split(',')])
