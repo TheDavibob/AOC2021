@@ -100,7 +100,7 @@ if __name__ == "__main__":
                 if len(s) in [2, 3, 4, 7]:
                     count += 1
 
-    print(count)
+    print(f"Part 1: {count}")
 
     # Part 2
     total = 0
@@ -108,4 +108,4 @@ if __name__ == "__main__":
         if line != "":
             total += decode_line(line)
 
-    print(total)
+    print(f"Part 2: {total}")
