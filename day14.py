@@ -38,41 +38,6 @@ def get_counts(string):
     return counts
 
 
-def trim_string(new_string, old_string):
-    start_idx = 0
-    for i in range(len(new_string)):
-        if new_string[:i] != old_string[:i]:
-            start_idx = i-1
-            break
-
-    end_idx = len(new_string)
-    for i in range(len(new_string)):
-        if new_string[-(i+1):] != old_string[-(i+1)]:
-            end_idx = -i
-            break
-
-    return new_string[start_idx:end_idx]
-
-
-def count_after(pair, num, insertion_mapping):
-    # have pair of letters 'XY'
-    count = {}
-    if num == 0:
-        return count
-
-    if pair in insertion_mapping.keys():
-        count = {insertion_mapping[pair] : 1}
-        pair_0_count = count_after(pair[0] + insertion_mapping[pair], num-1, insertion_mapping)
-        pair_1_count = count_after(insertion_mapping[pair] + pair[1], num-1, insertion_mapping)
-        for k, v in pair_0_count.items():
-            count[k] = count.get(k, 0) + v
-
-        for k, v in pair_1_count.items():
-            count[k] = count.get(k, 0) + v
-
-    return count
-
-
 def iterate_over_pairs(pairs_count, insertion_mapping):
     new_pairs_count = {}
     for pair in pairs_count.keys():
@@ -100,14 +65,7 @@ if __name__ == "__main__":
 
     print(max(counts.values()) - min(counts.values()))
 
-    counts = get_counts(initial)
-    for pair_0, pair_1 in zip(initial[:-1], initial[1:]):
-        new_counts = count_after(pair_0 + pair_1, 10, location)
-        for k, v in new_counts.items():
-            counts[k] = counts.get(k, 0) + v
-
-    print(max(counts.values()) - min(counts.values()))
-
+    # Instead focus on *pairs*
     pairs = []
     for pair_0, pair_1 in zip(initial[:-1], initial[1:]):
         pairs.append(pair_0 + pair_1)
@@ -116,11 +74,13 @@ if __name__ == "__main__":
     for _ in range(40):
         pairs_count = iterate_over_pairs(pairs_count, location)
 
+    # Convert to a doubled count of characters
     char_count = {}
     for k, v in pairs_count.items():
         char_count[k[0]] = char_count.get(k[0], 0) + v
         char_count[k[1]] = char_count.get(k[1], 0) + v
 
+    # Add the end points
     char_count[initial[0]] = char_count[initial[0]] + 1
     char_count[initial[-1]] = char_count[initial[-1]] + 1
 
