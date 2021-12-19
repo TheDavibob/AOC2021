@@ -62,12 +62,21 @@ def reduce_overlap(overlap):
             if c in d[0]:
                 new_possibles = tuple(tuple(e) for e in d[1])
                 possibles = possibles.intersection(new_possibles)
-        mapping[c] = next(iter(possibles))
+        if len(possibles) == 0:
+            continue
+        else:
+            mapping[c] = next(iter(possibles))
 
     return mapping
 
 
-def compute_offset(pairmap):
+def map_to_block0(mapping, block1):
+    frame_0 = np.array([k for k, v in mapping.items()])
+    frame_1 = np.array([v for k, v in mapping.items()])
+
+    d0 = frame_0[1] - frame_0[0]
+    d1 = frame_1[1] - frame_1[0]
+
     positive_permutations = [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
     positive_signs = [
         np.array([1, 1, 1]),
@@ -84,81 +93,45 @@ def compute_offset(pairmap):
         np.array([1, 1, -1]),
     ]
 
-    for d in pairmap:
-        # Points in first frame
-        x0, y0 = d[0]
+    candidate = None
+    for perm in positive_permutations:
+        if candidate is not None:
+            break
 
-        # Points in second frame
-        x1, y1 = d[1]
-
-        # First: get pair of possible permutations/signs by looking at in frame distances
-        d0 = x0 - y0
-        d1 = x1 - y1
-
-        if d0[0] in d0[1:]:
-            continue
-        elif d0[1] == d0[2]:
-            continue
-
-        candidate_permutation, candidate_sign = None, None
-        for permutation in positive_permutations:
-            for sign in positive_signs:
-                d1_p = np.array([d1[p] for p in permutation])*sign
-                if np.all(d1_p == d0):
-                    candidate_permutation = permutation
-                    candidate_sign = sign
-                    swap = False
-                elif np.all(d1_p == -d0):
-                    candidate_permutation = permutation
-                    candidate_sign = sign
-                    swap = True
-                    break
-            if candidate_permutation:
+        for sign in positive_signs:
+            if np.all(np.array([d1[p] for p in perm])*sign == d0):
+                candidate = perm, sign
                 break
 
-        for permutation in negative_permutations:
-            for sign in negative_signs:
-                d1_p = np.array([d1[p] for p in permutation])*sign
-                if np.all(d1_p == d0):
-                    candidate_permutation = permutation
-                    candidate_sign = sign
-                    swap = True
-                elif np.all(d1_p == -d0):
-                    candidate_permutation = permutation
-                    candidate_sign = sign
-                    swap = False
-                    break
-            if candidate_permutation:
+    for perm in negative_permutations:
+        if candidate is not None:
+            break
+
+        for sign in negative_signs:
+            if np.all(np.array([d1[p] for p in perm]) * sign == d0):
+                candidate = perm, sign
                 break
 
-        if swap:
-            candidate = y1
-        else:
-            candidate = y0
-
-        inverse_permutation = [np.arange(3)[p] for p in candidate_permutation]
-        offset = [(x0*candidate_sign)[p] for p in inverse_permutation] - candidate
-
-    return offset, candidate_permutation, candidate_sign
+    # Then: frame_0 = frame_0[0] + (frame_1-frame_1[0])[:, candidate[0]] * candidate[1]
+    block1_in_frame_0 = (
+        frame_0[0] + (block1 - frame_1[0])[:, candidate[0]] * candidate[1]
+    )
+    return block1_in_frame_0
 
 
 def append_to_block(block0, block1):
     overlap = get_overlap(block0, block1)
     if len(overlap) == 0:
-        print("No overlap")
+        # print("No overlap")
+        return block0, False
 
-    print(f"{len(overlap)} points overlap")
-    offset, perm, sign = compute_offset(overlap)
+    mapping = reduce_overlap(overlap)
+    # print(f"{len(mapping)} points overlap")
+    block1_0 = map_to_block0(mapping, block1)
 
-    new_block_0 = list(block0)
-    for b in block1:
-        rotated = np.array([b[p] for p in perm])*sign
-        new_block_0.append(rotated + offset)
-
-    print(len(new_block_0))
-    new_block_0 = np.unique(new_block_0, axis=0)
-    print(len(new_block_0))
-    return new_block_0
+    extended_block_0 = np.unique(np.vstack((block0, block1_0)), axis=0)
+    print(len(extended_block_0))
+    return extended_block_0, True
 
 
 def construct_all_maps(text):
@@ -169,8 +142,30 @@ def construct_all_maps(text):
     return blocks
 
 
+def main(blocks):
+    block = blocks[0]
+    length_so_far = len(block)
+    blocks_done = [False for _ in range(len(block))]
+    blocks_done[0] = True
+
+    while True:
+        for i, (b, done) in enumerate(zip(blocks, blocks_done)):
+            if not done:
+                block, success = append_to_block(block, b)
+                if success:
+                    done += 1
+                    print(f"Added block {i}")
+
+        if all(done):
+            break
+        length_so_far = len(block)
+        print(f'Iterated, length = {length_so_far}')
+
+    print(f"Final length: {length_so_far}")
+    return block
+
+
 if __name__ == "__main__":
     text = common.import_file('input/day19_input')
     blocks = construct_all_maps(text)
-    overlap = get_overlap(blocks[0], blocks[7])
-    # block = append_to_block(blocks[0], blocks[7])
+    block = main(blocks)
