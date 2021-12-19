@@ -55,6 +55,17 @@ def reduce_overlap(overlap):
     tuple_0 = tuple(tuple(c) for c in coords_in_frame_0)
     tuple_1 = tuple(tuple(c) for c in coords_in_frame_1)
 
+    mapping = dict()
+    for c in tuple_0:
+        possibles = set(tuple_1)
+        for d in overlap:
+            if c in d[0]:
+                new_possibles = tuple(tuple(e) for e in d[1])
+                possibles = possibles.intersection(new_possibles)
+        mapping[c] = next(iter(possibles))
+
+    return mapping
+
 
 def compute_offset(pairmap):
     positive_permutations = [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
