@@ -42,6 +42,20 @@ def get_overlap(block0, block1):
     return np.array(pairmap)
 
 
+def reduce_overlap(overlap):
+    coords_in_frame_0 = np.unique(
+        np.vstack([d[0] for d in overlap]),
+        axis=0
+    )
+    coords_in_frame_1 = np.unique(
+        np.vstack([d[1] for d in overlap]),
+        axis=0
+    )
+
+    tuple_0 = tuple(tuple(c) for c in coords_in_frame_0)
+    tuple_1 = tuple(tuple(c) for c in coords_in_frame_1)
+
+
 def compute_offset(pairmap):
     positive_permutations = [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
     positive_signs = [
@@ -147,5 +161,5 @@ def construct_all_maps(text):
 if __name__ == "__main__":
     text = common.import_file('input/day19_input')
     blocks = construct_all_maps(text)
-    # overlap = get_overlap(blocks[0], blocks[7])
-    block = append_to_block(blocks[0], blocks[7])
+    overlap = get_overlap(blocks[0], blocks[7])
+    # block = append_to_block(blocks[0], blocks[7])
