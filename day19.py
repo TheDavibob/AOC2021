@@ -69,13 +69,13 @@ def get_overlap_2(block0, block1):
     unique_xs = np.unique(row0)
     for i in unique_xs:
         if np.sum(row0 == i) > 1:
-            possibles = [row1[row0 == i][0], col1[row1 == i][0]]
+            possibles = [row1[row0 == i][0], col1[row0 == i][0]]
             if row1[row0 == i][1] in possibles:
                 j = row1[row0 == i][1]
             else:
-                j = row1[col0 == i][1]
+                j = col1[row0 == i][1]
 
-            mapping[block0[i]] = block1[j]
+            mapping[tuple(block0[i])] = tuple(block1[j])
 
         if len(mapping) > 1:
             return mapping
@@ -164,13 +164,18 @@ def map_to_block0(mapping, block1):
 
 
 def append_to_block(block0, block1):
-    overlap = get_overlap(block0, block1)
-    if len(overlap) == 0:
-        # print("No overlap")
+    # overlap = get_overlap(block0, block1)
+    # if len(overlap) == 0:
+    #     # print("No overlap")
+    #     return block0, None, False
+    #
+    # mapping = reduce_overlap(overlap)
+    # # print(f"{len(mapping)} points overlap")
+
+    mapping = get_overlap_2(block0, block1)
+    if mapping is None:
         return block0, None, False
 
-    mapping = reduce_overlap(overlap)
-    # print(f"{len(mapping)} points overlap")
     block1_0, sensor_in_frame_0 = map_to_block0(mapping, block1)
 
     extended_block_0 = np.unique(np.vstack((block0, block1_0)), axis=0)
