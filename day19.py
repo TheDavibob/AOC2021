@@ -29,17 +29,59 @@ def get_overlap(block0, block1):
     D1 = get_pairwise_distances(block1)
 
     pairmap = []
+    matches_0 = 0
     for row0 in range(D0.shape[1]):
+        found_match_0 = False
         for col0 in range(row0+1, D0.shape[2]):
             candidate_distances = D0[:, row0, col0]
+            done = False
             for row1 in range(D1.shape[1]):
                 for col1 in range(row1 + 1, D1.shape[2]):
                     if np.all(candidate_distances == D1[:, row1, col1]):
                         pairmap.append(
                             [[block0[row0], block0[col0]], [block1[row1], block1[col1]]]
                         )
+                        if not found_match_0:
+                            found_match_0 = True
+                            matches_0 += 1
+
+                        if matches_0 > 3:
+                            return np.array(pairmap)
+
+                        done = True
+                        break
+                if done:
+                    break
 
     return np.array(pairmap)
+
+
+def get_overlap_2(block0, block1):
+    D0 = get_pairwise_distances(block0)
+    D1 = get_pairwise_distances(block1)
+    S1 = np.sum(D1, axis=0)
+    S0 = np.sum(D0, axis=0)
+    S1[np.tril(np.ones_like(S1)).astype(bool)] = -1
+    S0[np.tril(np.ones_like(S0)).astype(bool)] = -2
+    row0, col0, row1, col1 = np.where(S0[:, :, None, None] - S1[None, None, :, :] == 0)
+
+    mapping = {}
+    unique_xs = np.unique(row0)
+    for i in unique_xs:
+        if np.sum(row0 == i) > 1:
+            possibles = [row1[row0 == i][0], col1[row1 == i][0]]
+            if row1[row0 == i][1] in possibles:
+                j = row1[row0 == i][1]
+            else:
+                j = row1[col0 == i][1]
+
+            mapping[block0[i]] = block1[j]
+
+        if len(mapping) > 1:
+            return mapping
+
+    return None
+
 
 
 def reduce_overlap(overlap):
@@ -62,7 +104,7 @@ def reduce_overlap(overlap):
             if c in d[0]:
                 new_possibles = tuple(tuple(e) for e in d[1])
                 possibles = possibles.intersection(new_possibles)
-        if len(possibles) == 0:
+        if (len(possibles) == 0) or len(possibles) > 1:
             continue
         else:
             mapping[c] = next(iter(possibles))
@@ -112,26 +154,28 @@ def map_to_block0(mapping, block1):
                 candidate = perm, sign
                 break
 
-    # Then: frame_0 = frame_0[0] + (frame_1-frame_1[0])[:, candidate[0]] * candidate[1]
     block1_in_frame_0 = (
         frame_0[0] + (block1 - frame_1[0])[:, candidate[0]] * candidate[1]
     )
-    return block1_in_frame_0
+    sensor_in_frame_0 = (
+            frame_0[0] + (np.array([[0, 0, 0]]) - frame_1[0])[:, candidate[0]] * candidate[1]
+    )[0]
+    return block1_in_frame_0, sensor_in_frame_0
 
 
 def append_to_block(block0, block1):
     overlap = get_overlap(block0, block1)
     if len(overlap) == 0:
         # print("No overlap")
-        return block0, False
+        return block0, None, False
 
     mapping = reduce_overlap(overlap)
     # print(f"{len(mapping)} points overlap")
-    block1_0 = map_to_block0(mapping, block1)
+    block1_0, sensor_in_frame_0 = map_to_block0(mapping, block1)
 
     extended_block_0 = np.unique(np.vstack((block0, block1_0)), axis=0)
     print(len(extended_block_0))
-    return extended_block_0, True
+    return extended_block_0, sensor_in_frame_0, True
 
 
 def construct_all_maps(text):
@@ -144,28 +188,34 @@ def construct_all_maps(text):
 
 def main(blocks):
     block = blocks[0]
-    length_so_far = len(block)
-    blocks_done = [False for _ in range(len(block))]
+    blocks_done = [False for _ in range(len(blocks))]
     blocks_done[0] = True
 
-    while True:
-        for i, (b, done) in enumerate(zip(blocks, blocks_done)):
-            if not done:
-                block, success = append_to_block(block, b)
-                if success:
-                    done += 1
-                    print(f"Added block {i}")
+    sensors = np.zeros((len(blocks), 3))
 
-        if all(done):
-            break
+    while True:
+        for i, b in enumerate(blocks):
+            done = blocks_done[i]
+            if not done:
+                block, sensor, success = append_to_block(block, b)
+                if success:
+                    blocks_done[i] = True
+                    sensors[i] = sensor
+                    print(f"Added block {i}, sensor at {sensor}")
+
         length_so_far = len(block)
         print(f'Iterated, length = {length_so_far}')
 
+        print(blocks_done)
+        if all(blocks_done):
+            break
+
     print(f"Final length: {length_so_far}")
-    return block
+    print(f"Max sensor distance: {np.max(get_pairwise_distances(sensors)[1])}")
+    return block, sensors
 
 
 if __name__ == "__main__":
     text = common.import_file('input/day19_input')
     blocks = construct_all_maps(text)
-    block = main(blocks)
+    block, sensors = main(blocks)
