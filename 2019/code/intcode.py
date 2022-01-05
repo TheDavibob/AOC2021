@@ -1,5 +1,5 @@
 class Intcode:
-    def __init__(self, intcode, input_list=None):
+    def __init__(self, intcode, input_list=None, pause_on_no_inputs=False):
         if isinstance(intcode, str):
             self.code = [int(s) for s in intcode.split(',')]
         else:
@@ -11,6 +11,8 @@ class Intcode:
         else:
             self.input_list = input_list
         self.input_pointer = 0
+
+        self.pause = pause_on_no_inputs
 
         self.output_list = []
 
@@ -35,9 +37,13 @@ class Intcode:
             n_parameters = 1
             parameters = self.get_parameters(n_parameters, parameter_code, write=True)
             if self.input_pointer == len(self.input_list):
-                new_input = int(input("Enter a value"))
+                if self.pause:
+                    return 2
+                else:
+                    new_input = int(input("Enter a value"))
             else:
                 new_input = self.input_list[self.input_pointer]
+                self.input_pointer += 1
 
             self.code[parameters[-1]] = new_input
         elif opcode == 4:
@@ -66,12 +72,12 @@ class Intcode:
             self.code[parameters[-1]] = int(parameters[0] == parameters[1])
         elif opcode == 99:
             n_parameters = 0
-            return True
+            return 1
 
         if increment:
             self.instruction_pointer += n_parameters + 1
 
-        return False
+        return 0
 
     def get_parameters(self, n_parameters, parameter_code, write=True):
         parameter_code = str(parameter_code).rjust(n_parameters, '0')[::-1]
@@ -90,9 +96,16 @@ class Intcode:
         return parameters
 
     def step_all(self):
-        finished = False
-        while not finished:
-            finished = self.step()
+        status = 0
+        while status == 0:
+            status = self.step()
+
+        if status == 1:
+            # Finished
+            return 0
+        else:
+            # Merely pausing
+            return 1
 
 
 def run_intcode(intcode, input_list=None):
