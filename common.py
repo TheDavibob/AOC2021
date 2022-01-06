@@ -112,3 +112,7 @@ def from_binary_array(bool_array: np.ndarray) -> int:
     int
     """
     return np.sum(2**np.arange(len(bool_array))[::-1] * bool_array)
+
+
+def part(part_no, answer):
+    print(f"Part {part_no}: {answer}")
