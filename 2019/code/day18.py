@@ -1,3 +1,6 @@
+from copy import copy
+from time import sleep
+
 import numpy as np
 
 import common
@@ -107,6 +110,28 @@ def get_distance_graph(grid_array, verbose=True):
     return distance_graph
 
 
+def reduce_distance_graph(distance_graph):
+    heuristic = {}
+    for source, info in distance_graph.items():
+        for target in info.keys():
+            heuristic[target] = np.inf
+
+    for source, info in distance_graph.items():
+        for target, (distance, blockers) in info.items():
+            if distance < heuristic[target]:
+                heuristic[target] = distance
+
+    heuristic[2] = 0
+    new_distance_graph = {}
+    for source, info in distance_graph.items():
+        new_distance_graph[source] = {
+            target: (sub_info[0] - heuristic[target], sub_info[1])
+            for target, sub_info in info.items()
+        }
+
+    return heuristic, new_distance_graph
+
+
 def get_viable_points(distance_graph, current_value, keys_so_far):
     viable_targets = []
     for possible_target, (distance, blockers) in distance_graph[current_value].items():
@@ -125,21 +150,25 @@ def get_viable_points(distance_graph, current_value, keys_so_far):
     return viable_targets
 
 
-def search(distance_graph, verbose=True):
+def search(distance_graph, heuristic_value, verbose=True):
     potential_distances = []
     best_distance = np.inf
 
     keys_so_far = [2]
     distances_so_far = [0]
     choices_so_far = [0]
+
     while True:
         if verbose:
-            print(best_distance, choices_so_far)
+            print(best_distance + heuristic_value, choices_so_far)
 
         viable_targets = get_viable_points(distance_graph, keys_so_far[-1], keys_so_far)
         viable_targets = sorted(viable_targets, key=lambda d: d[1])
 
-        if (choices_so_far[-1] == len(viable_targets)) or (distances_so_far[-1] + viable_targets[choices_so_far[-1]][1] > best_distance):
+        if (
+                (choices_so_far[-1] == len(viable_targets))
+                or (distances_so_far[-1] + viable_targets[choices_so_far[-1]][1] > best_distance)
+        ):
             keys_so_far = keys_so_far[:-1]
             distances_so_far = distances_so_far[:-1]
             choices_so_far = choices_so_far[:-1]
@@ -167,13 +196,45 @@ def search(distance_graph, verbose=True):
                 choices_so_far = choices_so_far[:-1]
                 choices_so_far[-1] += 1
 
-    return potential_distances
+    return best_distance + heuristic_value
 
 
 def search_on_grid_str(grid_str, verbose=True):
     grid_array = grid_str_to_grid_array(grid_str)
     distance_graph = get_distance_graph(grid_array, verbose)
-    return min(search(distance_graph, verbose))
+    # heuristic, reduced_distance_graph = reduce_distance_graph(distance_graph)
+    # return search(reduced_distance_graph, sum(heuristic.values()), verbose)
+    return recurse_search(distance_graph, 2, [2], {})
+
+
+def recurse_search(distance_graph, current_position, history, state_history):
+    state = (current_position, tuple(sorted(history)))
+    if state in state_history.keys():
+        return state_history[state]
+
+    is_finished = True
+    for source in distance_graph.keys():
+        if source not in history + [current_position]:
+            is_finished = False
+            break
+
+    if is_finished:
+        return 0
+
+    viable_targets = get_viable_points(distance_graph, current_position, history + [current_position])
+    best_outcome = None
+
+    for target, distance in viable_targets:
+        next_step = recurse_search(distance_graph, target, sorted(history + [current_position]), state_history)
+        if next_step is None:
+            continue
+
+        outcome = distance + next_step
+        if (best_outcome is None) or (outcome < best_outcome):
+            best_outcome = outcome
+
+    state_history[state] = best_outcome
+    return best_outcome
 
 
 if __name__ == "__main__":
