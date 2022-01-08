@@ -76,7 +76,8 @@ def get_distance_graph(grid_array, verbose=True):
     distance_graph = {}
     movement_points = np.where((200 > grid_array) & (grid_array >= 100))
 
-    start_point = np.where(grid_array == 2)
+    start_point = np.where((grid_array >= 2) & (grid_array < 100))
+    start_value = grid_array[start_point][0]
     start_map = {}
     flood_distance = flood_fill(grid_array, start_point)
     for i, j in zip(*movement_points):
@@ -85,7 +86,7 @@ def get_distance_graph(grid_array, verbose=True):
         start_map[value] = get_point_to_point_distance(grid_array, flood_distance, target)
         if verbose:
             print(f'Added {value} to start key')
-    distance_graph[2] = start_map
+    distance_graph[int(start_value)] = start_map
 
     for k, l in zip(*movement_points):
         source_value = grid_array[k, l]
@@ -162,6 +163,72 @@ def recurse_search(distance_graph, current_position, history, state_history):
 
     state_history[state] = best_outcome
     return best_outcome
+
+
+def chop_up_grid_array(grid_array, deal_with_middle = True):
+    middle = ((grid_array.shape[0] + 1) // 2, (grid_array.shape[1] + 1) // 2)
+    if deal_with_middle:
+        grid_array[middle[0]-2:middle[0]+1, middle[0]-2:middle[0]+1] = np.array([[2, 0, 2], [0, 0, 0], [2, 0, 2]])
+
+    grid_array[grid_array == 2] = [2, 3, 4, 5]
+
+    grid_0 = grid_array[:middle[0], :middle[1]]
+    grid_1 = grid_array[:middle[0], middle[1]-1:]
+    grid_2 = grid_array[middle[0]-1:, :middle[1]]
+    grid_3 = grid_array[middle[0]-1:, middle[1]-1:]
+    return grid_0, grid_1, grid_2, grid_3
+
+
+def recurse_search_multi(distance_graphs, current_positions, history, state_history):
+    state = (current_positions, tuple(history))
+    if state in state_history.keys():
+        return state_history[state]
+
+    all_sources = []
+    for distance_graph in distance_graphs:
+        for source in distance_graph.keys():
+            all_sources.append(source)
+
+    is_finished = True
+    for source in all_sources:
+        if source not in history.union(set(current_positions)):
+            is_finished = False
+
+    if is_finished:
+        return 0
+
+    viable_targets = {}
+    for i, (distance_graph, current_position) in enumerate(zip(distance_graphs, current_positions)):
+        viable_targets[i] = get_viable_points(distance_graph, current_position, {*history, *current_positions})
+
+    best_outcome = None
+    for i in range(4):
+        for target, distance in viable_targets[i]:
+            full_targets = list(current_positions)
+            current_position = full_targets[i]
+            full_targets[i] = target
+            next_step = recurse_search_multi(distance_graphs, tuple(full_targets), {*history, current_position}, state_history)
+            if next_step is None:
+                continue
+
+            outcome = distance + next_step
+            if (best_outcome is None) or (outcome < best_outcome):
+                best_outcome = outcome
+
+    state_history[state] = best_outcome
+    return best_outcome
+
+
+def part_2(grid_str, sort_out_middle=True, verbose=True):
+    grid_array = grid_str_to_grid_array(grid_str)
+    grid_arrays = chop_up_grid_array(grid_array, sort_out_middle)
+
+    distance_graphs = []
+    for g in grid_arrays:
+        distance_graphs.append(get_distance_graph(g, verbose))
+
+    answer = recurse_search_multi(distance_graphs, (2, 3, 4, 5), {2, 3, 4, 5}, {})
+    return answer
 
 
 if __name__ == "__main__":
@@ -248,3 +315,4 @@ if __name__ == "__main__":
 #################################################################################
 """
     common.part(1, search_on_grid_str(grid_str))
+    common.part(2, part_2(grid_str, sort_out_middle=True))
