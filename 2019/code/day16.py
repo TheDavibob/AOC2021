@@ -48,4 +48,3 @@ if __name__ == "__main__":
     for _ in range(100):
         new_input = cheeky_fft(new_input)
     common.part(2, int("".join(str(s) for s in new_input[:8])))
-
