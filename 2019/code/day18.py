@@ -33,6 +33,8 @@ def flood_fill(grid_array, source):
     while np.any(np.isinf(distance[grid_array > 0])):
         # Find all edge values
         edge_values = np.where(distance == current_value)
+        if len(edge_values[0]) == 0:
+            break
         for i, j in zip(*edge_values):
             for direction in neighbour_directions:
                 neighbour_position = tuple(np.array([i, j]) + np.array(direction))
