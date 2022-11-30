@@ -116,3 +116,59 @@ def from_binary_array(bool_array: np.ndarray) -> int:
 
 def part(part_no, answer):
     print(f"Part {part_no}: {answer}")
+
+
+def load_input(day):
+    return import_file("../input/day" + str(day))
+
+
+def single_dijkstra(distance_dict, filled_nodes):
+    """
+
+    distance_dict: Dict[node, distance: int]
+    filled_node: List[node]
+    """
+    unfilled_neighbours = {}
+    for edge, distance in distance_dict.items():
+        if (edge[0] in filled_nodes.keys()) and (edge[1] not in filled_nodes.keys()):
+            neighbour = edge[1]
+            if unfilled_neighbours.get(neighbour, None) is None:
+                unfilled_neighbours[neighbour] = distance + filled_nodes[edge[0]]
+            else:
+                unfilled_neighbours[neighbour] = min(distance + filled_nodes[edge[0]], unfilled_neighbours[neighbour])
+
+    new_neighbour = min(unfilled_neighbours, key=unfilled_neighbours.get)
+    filled_nodes[new_neighbour] = unfilled_neighbours[new_neighbour]
+    return filled_nodes, new_neighbour
+
+
+def flood_fill(grid_array, source):
+    distance = np.inf*np.ones_like(grid_array, dtype=float)
+    distance[source] = 0
+    current_value = 0
+
+    neighbour_directions = (
+        [0, 1],
+        [1, 0],
+        [-1, 0],
+        [0, -1]
+    )
+
+    while np.any(np.isinf(distance[grid_array > 0])):
+        # Find all edge values
+        edge_values = np.where(distance == current_value)
+        if len(edge_values[0]) == 0:
+            break
+        for i, j in zip(*edge_values):
+            for direction in neighbour_directions:
+                neighbour_position = tuple(np.array([i, j]) + np.array(direction))
+                if grid_array[neighbour_position] == 0:
+                    continue
+                if not np.isinf(distance[neighbour_position]):
+                    continue
+
+                distance[neighbour_position] = current_value + 1
+
+        current_value += 1
+
+    return distance
