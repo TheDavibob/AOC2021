@@ -1,4 +1,3 @@
-import numpy as np
 import common
 
 THEM = {
@@ -11,12 +10,6 @@ YOU = {
     "X": 0,
     "Y": 1,
     "Z": 2
-}
-
-RESULT = {
-    "X": -1,
-    "Y": 0,
-    "Z": 1
 }
 
 if __name__ == "__main__":
