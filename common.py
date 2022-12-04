@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Optional
 
 import numpy as np
@@ -172,3 +173,10 @@ def flood_fill(grid_array, source):
         current_value += 1
 
     return distance
+
+
+def load_todays_input(day_name):
+    fname = os.path.split(day_name)[-1].split(".")[0]
+    input_name = r"input/" + fname
+    text = import_file(input_name)
+    return text
