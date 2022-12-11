@@ -30,13 +30,17 @@ class Monkey:
         self.inspection_count = 0
 
 
-def step(monkeys: list[Monkey], n_worry, debug=False):
+def step(monkeys: list[Monkey], n_worry, lcm = None, debug=False):
     for monkey in monkeys:
         while monkey.worry_levels:
             monkey.inspection_count += 1
             worry_level = monkey.worry_levels.pop(0)
             new_worry_level = monkey.operation(worry_level)
             new_worry_level = new_worry_level // n_worry
+
+            if lcm:
+                new_worry_level = new_worry_level % lcm
+
             if new_worry_level % monkey.test_divisor == 0:
                 new_monkey = monkey.if_true
             else:
@@ -120,16 +124,15 @@ if __name__ == "__main__":
     for block in text.split("\n\n"):
         monkeys.append(Monkey(block))
 
-    all_items = [m.worry_levels for m in monkeys]
-    monkey_counts = [0 for m in monkeys]
+    monkeys = []
+    for block in text.split("\n\n"):
+        monkeys.append(Monkey(block))
+
+    n_worry = 1
     lcm = math.lcm(*[monkey.test_divisor for monkey in monkeys])
-    for i_monkey, worry_levels in enumerate(all_items):
-        for worry_level in tqdm(worry_levels):
-            # print("New worry level")
-            monkey = copy(i_monkey)
-            for _ in range(10000):
-                # print(f"Prior monkey, worry: {monkey}, {worry_level}")
-                worry_level, monkey, monkey_counts = step_single_item(worry_level, monkey, monkeys, monkey_counts, 1, lcm)
-                # print(f"Post monkey, worry: {monkey}, {worry_level}")
+    for round in range(10000):
+        monkeys = step(monkeys, n_worry, lcm)
+
+    monkey_counts = [m.inspection_count for m in monkeys]
 
     common.part(2, math.prod(sorted(monkey_counts)[-2:]))
