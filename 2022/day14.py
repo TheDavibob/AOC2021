@@ -1,4 +1,6 @@
 import numpy as np
+from matplotlib import pyplot as plt
+
 import common
 
 
@@ -110,12 +112,14 @@ if __name__ == "__main__":
 
     common.part(1, counter-1)
 
-    array, point_in_grid = parse_input(text, part_two=True)
+    array_2, point_in_grid = parse_input(text, part_two=True)
     start_point = point_in_grid(500, 0)
     success = True
     counter = 0
     while success:
-        array, success = step_sand(array, start_point)
+        array_2, success = step_sand(array_2, start_point)
         counter += 1
 
     common.part(2, counter-1)
+
+    plt.matshow(array_2.T)
