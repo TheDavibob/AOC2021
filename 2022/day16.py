@@ -1,6 +1,9 @@
 import functools
+from copy import copy
 
 import numpy as np
+from tqdm import tqdm
+
 import common
 
 
@@ -192,18 +195,36 @@ def step_2(time_remaining, current_idx, flow_rate, others, others_lengths, prev_
 
 
 @functools.lru_cache()
-def step_elephant(time_remaining, current_idx, current_elephant, flow_rate, others, prev_idx, prev_elephant):
+def step_elephant(time_remaining, current_idx, current_elephant, flow_rate, others,
+                  prev_idx, prev_elephant):
     if time_remaining <= 0:
         return 0
 
     self_movement_options = others[current_idx]
     elephant_movement_options = others[current_elephant]
-    if flow_rate[current_idx] == 0:
+    if flow_rate[current_idx] != 0:
         self_movement_options = self_movement_options + (current_idx,)
 
-    if flow_rate[current_elephant] == 0:
+    if flow_rate[current_elephant] != 0:
         if current_elephant != current_idx:
             elephant_movement_options = elephant_movement_options + (current_elephant,)
+
+    if flow_rate[current_idx]*(time_remaining - 1) \
+            >= max(flow_rate)*(time_remaining-2):
+        if current_idx in self_movement_options:
+            self_movement_options = (current_idx,)
+
+    if flow_rate[current_elephant]*(time_remaining - 1) \
+            >= max(flow_rate)*(time_remaining-2):
+        if current_elephant in elephant_movement_options:
+            elephant_movement_options = (current_elephant,)
+
+    self_movement_options = tuple(
+        sorted(self_movement_options, key=lambda x: flow_rate[x])[::-1]
+    )
+    elephant_movement_options = tuple(
+        sorted(elephant_movement_options, key=lambda x: flow_rate[x])[::-1]
+    )
 
     max_gain = 0
     for self_movement in self_movement_options:
@@ -215,6 +236,9 @@ def step_elephant(time_remaining, current_idx, current_elephant, flow_rate, othe
                 continue
 
             if (elephant_movement == self_movement) and (elephant_movement != current_elephant):
+                continue
+
+            if (elephant_movement == self_movement) and (self_movement != current_idx):
                 continue
 
             increment = 0
@@ -234,6 +258,10 @@ def step_elephant(time_remaining, current_idx, current_elephant, flow_rate, othe
             else:
                 new_prev_elephant = prev_elephant + (current_elephant,)
 
+            if elephant_movement < self_movement:
+                self_movement, elephant_movement = elephant_movement, self_movement
+                new_prev_idx, new_prev_elephant = new_prev_elephant, new_prev_idx
+
             gain = step_elephant(
                 time_remaining-1,
                 self_movement,
@@ -247,7 +275,90 @@ def step_elephant(time_remaining, current_idx, current_elephant, flow_rate, othe
             if gain > max_gain:
                 max_gain = gain
 
+            if sum(new_flow) * time_remaining - 1 < max_gain:
+                return max_gain
+
+    print(time_remaining, max_gain)
+
     return max_gain
+
+
+def breadth_first(
+        current_time,
+        current_positions,
+        current_scores,
+        current_active_valves,
+        flow_rates,
+        links
+):
+    new_time = current_time - 1
+
+    # Should we allow "no move"?
+    new_positions = copy(current_positions)
+    new_scores = copy(current_scores)
+    new_active_valves = copy(current_active_valves)
+    # new_positions = []
+    # new_scores = []
+    # new_active_valves = []
+
+    for pos, score, valves in zip(
+            current_positions, current_scores, current_active_valves
+    ):
+        new_score = score + sum(flow_rates[v] for v in valves)
+        idx_self, idx_el = pos
+
+        opt_self = links[idx_self]
+        opt_el = links[idx_el]
+
+        if (flow_rates[idx_self] != 0) and (idx_self not in valves):
+            opt_self = opt_self + (idx_self,)
+
+        if (flow_rates[idx_el] != 0) and (idx_el not in valves):
+            if idx_el != idx_self:
+                opt_el = opt_el + (idx_el,)
+
+        opt_self = tuple(
+            sorted(opt_self, key=lambda x: flow_rates[x])[::-1]
+        )
+        opt_el = tuple(
+            sorted(opt_el, key=lambda x: flow_rates[x])[::-1]
+        )
+
+        for move_self in opt_self:
+            for move_el in opt_el:
+                new_valves = copy(valves)
+                new_position = sorted((move_self, move_el))
+                if move_el == idx_el:
+                    new_valves.add(idx_el)
+                if move_self == idx_self:
+                    new_valves.add(idx_self)
+
+                replaced = False
+                if new_position in new_positions:
+                    # Can we improve any estimates?
+                    locs = [i for i, x in enumerate(new_positions) if x == new_position]
+                    for loc in locs:
+                        if new_valves == new_active_valves[loc]:
+                            if new_score >= new_scores[loc]:
+                                new_scores[loc] = new_score
+                                replaced = True
+                                break
+                            else:
+                                replaced = True
+                                break
+
+                        if new_valves.issubset(new_active_valves[loc]):
+                            if new_score < new_scores[loc]:
+                                # Discard - the existing is better
+                                replaced = True
+                                break
+
+                if not replaced:
+                    new_positions.append(new_position)
+                    new_scores.append(new_score)
+                    new_active_valves.append(new_valves)
+
+    return new_time, new_positions, new_scores, new_active_valves
 
 
 
@@ -264,18 +375,26 @@ Valve JJ has flow rate=21; tunnel leads to valve II"""
 
 
 if __name__ == "__main__":
-    # text = common.load_todays_input(__file__)
-    text = sample_text
-    valves = parse_and_reduce_input(text)
-    flow_rates, links, link_lengths = convert_input(valves)
+    text = common.load_todays_input(__file__)
+    # valves = parse_and_reduce_input(text)
+    # flow_rates, links, link_lengths = convert_input(valves)
 
     # best_movement = step(30, "AA", valves)
     # idx_AA = list(valves.keys()).index("AA")
     # best_movement = step_2(30, idx_AA, flow_rates, links, link_lengths, tuple())
     # common.part(1, best_movement)
 
-    valves = parse_input(text)
+    valves = parse_input(sample_text)
     flow_rates, links = convert_input_simple(valves)
     idx_AA = list(valves.keys()).index("AA")
-    max_gain = step_elephant(1, idx_AA, list(valves.keys()).index("BB"), flow_rates, links, tuple(), tuple())
-    common.part(2, max_gain)
+    time = 26
+    pos = [(idx_AA, idx_AA)]
+    scores = [0]
+    active = [set()]
+
+    for _ in range(26):
+        time, pos, scores, active = \
+            breadth_first(time, pos, scores, active, flow_rates, links)
+        print(time, len(pos))
+
+    common.part(2, max(scores))
