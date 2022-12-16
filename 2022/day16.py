@@ -195,6 +195,50 @@ def step_2(time_remaining, current_idx, flow_rate, others, others_lengths, prev_
 
 
 @functools.lru_cache()
+def count_paths(
+        time_remaining,
+        current_idx,
+        flow_rate,
+        others,
+        others_lengths,
+        prev_idx
+):
+    if time_remaining <= 0:
+        return 0
+
+    n_paths = 0
+
+    if flow_rate[current_idx] != 0:
+        new_flow_rate = list(flow_rate)
+        new_flow_rate[current_idx] = 0
+        n_paths += count_paths(
+            time_remaining-1,
+            current_idx,
+            tuple(new_flow_rate),
+            others,
+            others_lengths,
+            tuple()
+        )
+
+    for new_idx, dist in zip(others[current_idx], others_lengths[current_idx]):
+        if new_idx in prev_idx:
+            continue  # don't immediately move back
+
+        prev_idx = prev_idx + (current_idx,)
+
+        n_paths += count_paths(
+            time_remaining-dist,
+            new_idx,
+            flow_rate,
+            others,
+            others_lengths,
+            prev_idx
+        )
+
+    return n_paths
+
+
+@functools.lru_cache()
 def step_elephant(time_remaining, current_idx, current_elephant, flow_rate, others,
                   prev_idx, prev_elephant):
     if time_remaining <= 0:
@@ -327,7 +371,7 @@ def breadth_first(
         for move_self in opt_self:
             for move_el in opt_el:
                 new_valves = copy(valves)
-                new_position = sorted((move_self, move_el))
+                new_position = tuple(sorted((move_self, move_el)))
                 if move_el == idx_el:
                     new_valves.add(idx_el)
                 if move_self == idx_self:
@@ -358,8 +402,32 @@ def breadth_first(
                     new_scores.append(new_score)
                     new_active_valves.append(new_valves)
 
-    return new_time, new_positions, new_scores, new_active_valves
+    unique_positions = set(new_positions)
+    new_new_positions = []
+    new_new_scores = []
+    new_new_active_valves = []
+    for unique_position in unique_positions:
+        locs_pos = [i for i, x in enumerate(new_positions) if x == unique_position]
+        unique_position_valves = (new_active_valves[loc] for loc in locs_pos)
+        for unique_position_valve in unique_position_valves:
+            unique_score = max([
+                z for x, y, z in zip(new_positions, new_active_valves, new_scores)
+                if (x == unique_position) and (y == unique_position_valve)
+            ])
 
+            new_new_positions.append(unique_position)
+            new_new_active_valves.append(set(unique_position_valve))
+            new_new_scores.append(unique_score)
+
+    return new_time, new_new_positions, new_new_scores, new_new_active_valves
+
+
+def array_version(flow_rates, links):
+    n_non_zero_flows = sum(flow_rates > 0)
+    all_state_array = np.zeros(
+        (len(flow_rates), len(flow_rates), n_non_zero_flows),
+        dtype=int
+    )
 
 
 sample_text = """Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
@@ -376,25 +444,32 @@ Valve JJ has flow rate=21; tunnel leads to valve II"""
 
 if __name__ == "__main__":
     text = common.load_todays_input(__file__)
-    # valves = parse_and_reduce_input(text)
-    # flow_rates, links, link_lengths = convert_input(valves)
+    valves = parse_and_reduce_input(text)
+    flow_rates, links, link_lengths = convert_input(valves)
 
     # best_movement = step(30, "AA", valves)
-    # idx_AA = list(valves.keys()).index("AA")
+    idx_AA = list(valves.keys()).index("AA")
     # best_movement = step_2(30, idx_AA, flow_rates, links, link_lengths, tuple())
     # common.part(1, best_movement)
 
-    valves = parse_input(sample_text)
-    flow_rates, links = convert_input_simple(valves)
-    idx_AA = list(valves.keys()).index("AA")
-    time = 26
-    pos = [(idx_AA, idx_AA)]
-    scores = [0]
-    active = [set()]
+    # valves = parse_input(text)
+    # flow_rates, links = convert_input_simple(valves)
+    # idx_AA = list(valves.keys()).index("AA")
+    # time = 26
+    # pos = [(idx_AA, idx_AA)]
+    # scores = [0]
+    # active = [set()]
 
-    for _ in range(26):
-        time, pos, scores, active = \
-            breadth_first(time, pos, scores, active, flow_rates, links)
-        print(time, len(pos))
+    # for _ in range(26):
+    #     time, pos, scores, active = \
+    #         breadth_first(time, pos, scores, active, flow_rates, links)
+    #     print(time, len(pos))
 
-    common.part(2, max(scores))
+    common.part(2, count_paths(
+        26,
+        idx_AA,
+        flow_rates,
+        links,
+        link_lengths,
+        tuple()
+    ))
