@@ -84,8 +84,6 @@ def convert_input(valves):
     for valve in valves.values():
         flow_rate.append(valve["flow_rate"])
 
-    open = [False for valve in valves]
-
     others = []
     others_dist = []
     for valve in valves.values():
@@ -98,7 +96,23 @@ def convert_input(valves):
         others.append(tuple(idxs))
         others_dist.append(tuple(dists))
 
-    return tuple(flow_rate), tuple(open), tuple(others), tuple(others_dist)
+    return tuple(flow_rate), tuple(others), tuple(others_dist)
+
+
+def convert_input_simple(valves):
+    flow_rate = []
+    for valve in valves.values():
+        flow_rate.append(valve["flow_rate"])
+
+    others = []
+    for valve in valves.values():
+        idxs = []
+        for other in valve["others"]:
+            idx = list(valves.keys()).index(other)
+            idxs.append(idx)
+        others.append(tuple(idxs))
+
+    return tuple(flow_rate), tuple(others)
 
 
 def step(time_remaining, current_position, reduced_valve_dict):
@@ -153,12 +167,15 @@ def step_2(time_remaining, current_idx, flow_rate, others, others_lengths, prev_
             tuple()  # no previous index
         ) + (time_remaining - 1) * flow_rate[current_idx]
 
+    if flow_rate[current_idx]*(time_remaining - 1) >= max(flow_rate)*(time_remaining-2):
+        return value_if_opened
+
     best_movement = value_if_opened
     for new_idx, dist in zip(others[current_idx], others_lengths[current_idx]):
         if new_idx in prev_idx:
             continue  # don't immediately move back
 
-        new_prev_idx = prev_idx + (current_idx,)
+        prev_idx = prev_idx + (current_idx,)
 
         value_if_move = step_2(
             time_remaining-dist,
@@ -166,7 +183,7 @@ def step_2(time_remaining, current_idx, flow_rate, others, others_lengths, prev_
             flow_rate,
             others,
             others_lengths,
-            new_prev_idx
+            prev_idx
         )
         if value_if_move > best_movement:
             best_movement = value_if_move
@@ -174,8 +191,67 @@ def step_2(time_remaining, current_idx, flow_rate, others, others_lengths, prev_
     return best_movement
 
 
+@functools.lru_cache()
+def step_elephant(time_remaining, current_idx, current_elephant, flow_rate, others, prev_idx, prev_elephant):
+    if time_remaining <= 0:
+        return 0
 
-sample_text="""Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
+    self_movement_options = others[current_idx]
+    elephant_movement_options = others[current_elephant]
+    if flow_rate[current_idx] == 0:
+        self_movement_options = self_movement_options + (current_idx,)
+
+    if flow_rate[current_elephant] == 0:
+        if current_elephant != current_idx:
+            elephant_movement_options = elephant_movement_options + (current_elephant,)
+
+    max_gain = 0
+    for self_movement in self_movement_options:
+        if self_movement in prev_idx:
+            continue
+
+        for elephant_movement in elephant_movement_options:
+            if elephant_movement in prev_elephant:
+                continue
+
+            if (elephant_movement == self_movement) and (elephant_movement != current_elephant):
+                continue
+
+            increment = 0
+            new_flow = list(flow_rate)
+
+            if self_movement == current_idx:
+                new_flow[current_idx] = 0
+                increment += (time_remaining-1) * flow_rate[current_idx]
+                new_prev_idx = tuple()
+            else:
+                new_prev_idx = prev_idx + (current_idx,)
+
+            if elephant_movement == current_elephant:
+                new_flow[current_elephant] = 0
+                increment += (time_remaining-1) * flow_rate[current_elephant]
+                new_prev_elephant = tuple()
+            else:
+                new_prev_elephant = prev_elephant + (current_elephant,)
+
+            gain = step_elephant(
+                time_remaining-1,
+                self_movement,
+                elephant_movement,
+                tuple(new_flow),
+                others,
+                new_prev_idx,
+                new_prev_elephant
+            ) + increment
+
+            if gain > max_gain:
+                max_gain = gain
+
+    return max_gain
+
+
+
+sample_text = """Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
 Valve BB has flow rate=13; tunnels lead to valves CC, AA
 Valve CC has flow rate=2; tunnels lead to valves DD, BB
 Valve DD has flow rate=20; tunnels lead to valves CC, AA, EE
@@ -191,12 +267,15 @@ if __name__ == "__main__":
     # text = common.load_todays_input(__file__)
     text = sample_text
     valves = parse_and_reduce_input(text)
-    flow_rates, open_status, links, link_lengths = convert_input(valves)
+    flow_rates, links, link_lengths = convert_input(valves)
 
     # best_movement = step(30, "AA", valves)
+    # idx_AA = list(valves.keys()).index("AA")
+    # best_movement = step_2(30, idx_AA, flow_rates, links, link_lengths, tuple())
+    # common.part(1, best_movement)
+
+    valves = parse_input(text)
+    flow_rates, links = convert_input_simple(valves)
     idx_AA = list(valves.keys()).index("AA")
-    best_movement = step_2(30, idx_AA, flow_rates, links, link_lengths, tuple())
-
-    common.part(1, best_movement)
-
-    common.part(2, "TBC")
+    max_gain = step_elephant(1, idx_AA, list(valves.keys()).index("BB"), flow_rates, links, tuple(), tuple())
+    common.part(2, max_gain)
