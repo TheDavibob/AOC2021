@@ -104,16 +104,20 @@ def step_rock(big_grid, idx, instructions, instructions_idx):
 def cycle(n, instructions):
     big_grid = np.zeros((0, 7))
     instructions_idx = 0
-    for idx in tqdm(range(n)):
+    height_accumulator = 0
+    for idx in range(n):
         big_grid, instructions_idx = step_rock(big_grid, idx, instructions, instructions_idx)
+        h = get_grid_height(big_grid)
+        if np.all(big_grid[h-1]):
+            big_grid = np.zeros((0, 7))
+            height_accumulator += h
 
-    # print(big_grid[::-1])
-    return big_grid
+    return get_grid_height(big_grid) + height_accumulator, big_grid
 
 
 def get_grid_height(grid):
-    i=1
-    for i in range(1, grid.shape[0]):
+    i = 1
+    for i in range(1, grid.shape[0]+2):
         if np.any(grid[-i:]):
             break
 
@@ -122,14 +126,34 @@ def get_grid_height(grid):
     return height
 
 
+def quick_form(n, instructions):
+    # These numbers are experimentally defined:
+    # Starting at 4010, have cycles of 1745 in length, which each gain 2750 height.
+    # At the start of each cycle, instructions_idx is 3028
+    # Height at 4010 is 6312
+    # Iterate through only what remains of the cycle
+
+    height_in_cycles = 2750 * ((n - 1 - 4010) // 1745) + 6312
+    rem_time_through_cycle = (n - 1 - 4010) % 1745
+    instructions_idx = 3028
+
+    big_grid = np.zeros((0, 7))
+    for idx in range(rem_time_through_cycle):
+        big_grid, instructions_idx = step_rock(big_grid, idx+1, instructions, instructions_idx)
+
+    return height_in_cycles + get_grid_height(big_grid)
+
 
 if __name__ == "__main__":
     text = common.load_todays_input(__file__)
     # instructions = ">>><<><>><<<>><>>><<<>>><<<><<<>><>><<>>"
     instructions = text.split("\n")[0]
-    big_grid = cycle(2022, instructions)
+    height = cycle(2022, instructions)[0]
 
-    common.part(1, get_grid_height(big_grid))
+    common.part(1, height)
 
-    # big_grid = cycle(1000000000000, instructions)
-    common.part(2, get_grid_height(big_grid))
+    # Validate quick form
+    assert quick_form(5000, instructions) == cycle(5000, instructions)[0]
+    assert quick_form(6000, instructions) == cycle(6000, instructions)[0]
+
+    common.part(2, quick_form(1000000000000, instructions))
