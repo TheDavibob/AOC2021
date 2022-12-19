@@ -1,3 +1,5 @@
+import functools
+
 import numpy as np
 import common
 
@@ -44,29 +46,32 @@ def reduce_blueprint(blueprint):
     return cost_array
 
 
-def evaluate_blueprint(n_remaining_steps, built_so_far, items_so_far, cost_array):
+def evaluate_blueprint(
+        n_remaining_steps,
+        built_so_far,
+        items_so_far,
+        cost_array,
+        best_at_time,
+        best_path
+):
     # Process the current minute
-    print(n_remaining_steps, built_so_far, items_so_far)
+    print(best_at_time)
+
+    theoretical = theoretical_max(
+        n_remaining_steps,
+        built_so_far,
+        items_so_far,
+        cost_array
+    )
+    if theoretical <= best_at_time[n_remaining_steps - 1]:
+        return 0, best_at_time, []
 
     new_items = np.zeros(4, dtype=int)
     for idx, (i, b) in enumerate(zip(items_so_far, built_so_far)):
         new_items[idx] = i + b
 
     if n_remaining_steps == 1:
-        return new_items[-1]
-
-    if n_remaining_steps ** 2 + items_so_far[2] < cost_array[3, 2]:
-        # We cannot get enough obsidian to build a new geode thing
-        # FIX THIS - is a good heuristic
-
-        # Idea: compute the maximum possible of each item that could
-        # be mined, if a new extractor was built every sample
-        # If say, cannot mine enough obsidian to make any geodes,
-        # just compute the final answer (i.e. geode mines * rem time + geodes)
-        # If say, cannot mine enough clay to make any more obsidian,
-        # trim the obsidian max (to obsidian mines * rem_time + obsidian) and repeat.
-        # Feasibly could do same for clay, but this gets messy.
-        return new_items[-1]
+        return new_items[-1], best_at_time, best_path
 
     can_build = []
     for rob_idx in range(4):
@@ -77,14 +82,19 @@ def evaluate_blueprint(n_remaining_steps, built_so_far, items_so_far, cost_array
     can_build = can_build[::-1]
 
     if (2 not in can_build) or (3 not in can_build):
-        best_n_geodes = evaluate_blueprint(
+        new_best_path = best_path + [-1]
+        best_n_geodes, best_at_time, final_best_path = evaluate_blueprint(
             n_remaining_steps - 1,
             built_so_far.copy(),
             new_items,
-            cost_array
+            cost_array,
+            best_at_time,
+            new_best_path
         )
+
     else:
         best_n_geodes = 0
+        final_best_path = []
 
     if 3 in can_build:
         can_build = [3]
@@ -92,18 +102,166 @@ def evaluate_blueprint(n_remaining_steps, built_so_far, items_so_far, cost_array
     for idx in can_build:
         new_built_so_far = built_so_far.copy()
         new_built_so_far[idx] += 1
-        n_geodes = evaluate_blueprint(
+
+        items_after_payment = new_items.copy()
+        items_after_payment -= cost_array[idx]
+
+        new_best_path = best_path + [idx]
+        n_geodes, best_at_time, new_best_path = evaluate_blueprint(
             n_remaining_steps - 1,
             new_built_so_far,
-            new_items,
-            cost_array
+            items_after_payment,
+            cost_array,
+            best_at_time,
+            new_best_path
         )
 
         if n_geodes > best_n_geodes:
             best_n_geodes = n_geodes
+            final_best_path = new_best_path
 
-    return best_n_geodes
+    if best_n_geodes > best_at_time[n_remaining_steps - 1]:
+        best_at_time[n_remaining_steps - 1] = best_n_geodes
 
+    return best_n_geodes, best_at_time, final_best_path
+
+
+def theoretical_max(n_remaining_steps, built_so_far, items_so_far, cost_array):
+    ore_max = theoretical_ore(
+        n_remaining_steps,
+        built_so_far[0],
+        items_so_far[0],
+        cost_array[0, 0],
+        max(cost_array[:, 0])
+    )
+
+    clay_max = theoretical_clay(
+        n_remaining_steps,
+        built_so_far[1],
+        items_so_far[1],
+        cost_array[1, 0],
+        max(cost_array[:, 1]),
+        tuple(ore_max)
+    )
+
+    obsidian_max = theoretical_obsidian(
+        n_remaining_steps,
+        built_so_far[2],
+        items_so_far[2],
+        cost_array[2, 0],
+        cost_array[2, 1],
+        max(cost_array[:, 2]),
+        tuple(ore_max),
+        tuple(clay_max)
+    )
+
+    geode_max = theoretical_geode(
+        n_remaining_steps,
+        built_so_far[3],
+        items_so_far[3],
+        cost_array[3, 0],
+        cost_array[3, 2],
+        tuple(ore_max),
+        tuple(obsidian_max)
+    )
+
+    return geode_max[-1]
+
+
+@functools.cache
+def theoretical_ore(
+        n_remaining_steps,
+        ore_mines,
+        ore_so_far,
+        ore_cost_in_ore,
+        max_number_ore_mines
+):
+    ore = ore_so_far * np.ones(n_remaining_steps, dtype=int)
+    n_added = 0
+    for idx in range(n_remaining_steps):
+        ore[idx] += (n_added + ore_mines) + ore[idx-1]
+
+        if n_added + ore_mines == max_number_ore_mines:
+            pass
+        elif ore[idx-1] - n_added*ore_cost_in_ore >= ore_cost_in_ore:
+            n_added += 1
+
+    return ore
+
+
+@functools.cache
+def theoretical_clay(
+        n_remaining_steps,
+        clay_mines,
+        clay_so_far,
+        clay_cost_in_ore,
+        max_number_clay_mines,
+        max_ore_at_time
+):
+    clay = clay_so_far * np.ones(n_remaining_steps, dtype=int)
+    n_added = 0
+    for idx in range(n_remaining_steps):
+        clay[idx] += (n_added + clay_mines) + clay[idx-1]
+
+        if n_added + clay_mines == max_number_clay_mines:
+            pass
+        elif max_ore_at_time[idx] - n_added*clay_cost_in_ore >= clay_cost_in_ore:
+            n_added += 1
+
+    return clay
+
+
+@functools.cache
+def theoretical_obsidian(
+        n_remaining_steps,
+        obsidian_mines,
+        obsidian_so_far,
+        obsidian_cost_in_ore,
+        obsidian_cost_in_clay,
+        max_number_obsidian_mines,
+        max_ore_at_time,
+        max_clay_at_time
+):
+    obsidian = obsidian_so_far * np.ones(n_remaining_steps, dtype=int)
+    n_added = 0
+    for idx in range(n_remaining_steps):
+        obsidian[idx] += (n_added + obsidian_mines) + obsidian[idx-1]
+
+        if n_added + obsidian_mines == max_number_obsidian_mines:
+            continue
+        elif (
+            max_ore_at_time[idx] - n_added*obsidian_cost_in_ore >= obsidian_cost_in_ore
+        ) and (
+            max_clay_at_time[idx] - n_added*obsidian_cost_in_clay >= obsidian_cost_in_clay
+        ):
+            n_added += 1
+
+    return obsidian
+
+
+@functools.cache
+def theoretical_geode(
+        n_remaining_steps,
+        geode_mines,
+        geode_so_far,
+        geode_cost_in_ore,
+        geode_cost_in_obsidian,
+        max_ore_at_time,
+        max_obsidian_at_time
+):
+    geode = geode_so_far * np.ones(n_remaining_steps, dtype=int)
+    n_added = 0
+    for idx in range(n_remaining_steps):
+        geode[idx] += (n_added + geode_mines) + geode[idx - 1]
+
+        if (
+            max_ore_at_time[idx] - n_added*geode_cost_in_ore >= geode_cost_in_ore
+        ) and (
+            max_obsidian_at_time[idx] - n_added*geode_cost_in_obsidian >= geode_cost_in_obsidian
+        ):
+            n_added += 1
+
+    return geode
 
 
 if __name__ == "__main__":
@@ -115,9 +273,17 @@ if __name__ == "__main__":
         else:
             blueprints.append(reduce_blueprint(parse_blueprint(line)))
 
-    start = np.zeros(4,)
+    start = np.zeros(4, dtype=int)
     start[0] = 1
-    n_geodes = evaluate_blueprint(24, start, np.zeros(4, ), blueprints[0])
+    n_geodes, best_at_time, best_path = evaluate_blueprint(
+        24,
+        start,
+        np.zeros(4, ),
+        blueprints[0],
+        np.zeros(24, dtype=int),
+        []
+    )
+    # print(theoretical_max(24, start, np.zeros(4, dtype=int), blueprints[0]))
 
     common.part(1, "TBC")
 
