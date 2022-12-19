@@ -1,5 +1,8 @@
 import warnings
+from time import sleep
 
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
@@ -144,6 +147,35 @@ def quick_form(n, instructions):
     return height_in_cycles + get_grid_height(big_grid)
 
 
+def cycle_and_plot(n_cycles, instructions, canvas_height, tetris=True):
+    big_grid = np.zeros((0, 7))
+
+    plt.ion()
+    fig, ax = plt.subplots()
+    canvas = np.zeros((canvas_height, 7))
+    im = ax.imshow(canvas[::-1], vmin=0, vmax=1)
+    plt.show()
+    fig.canvas.draw()
+    sleep(1)
+
+    instructions_idx = 0
+    for idx in range(n_cycles):
+        big_grid, instructions_idx = step_rock(big_grid, idx, instructions, instructions_idx)
+
+        if tetris:
+            h = get_grid_height(big_grid)
+            if np.all(big_grid[h-1]):
+                big_grid = np.zeros((0, 7))
+
+        filled_grid = big_grid[-canvas_height:]
+        canvas = np.zeros((canvas_height, 7))
+        if filled_grid.shape[0] != 0:
+            canvas[-filled_grid.shape[0]:, :] = filled_grid
+        im.set_data(canvas[::-1])
+        im.draw(fig.canvas.renderer)
+        sleep(1)
+
+
 if __name__ == "__main__":
     text = common.load_todays_input(__file__)
     # instructions = ">>><<><>><<<>><>>><<<>>><<<><<<>><>><<>>"
@@ -153,7 +185,10 @@ if __name__ == "__main__":
     common.part(1, height)
 
     # Validate quick form
-    assert quick_form(5000, instructions) == cycle(5000, instructions)[0]
-    assert quick_form(6000, instructions) == cycle(6000, instructions)[0]
+    # assert quick_form(5000, instructions) == cycle(5000, instructions)[0]
+    # assert quick_form(6000, instructions) == cycle(6000, instructions)[0]
 
     common.part(2, quick_form(1000000000000, instructions))
+
+    matplotlib.use("Agg")
+    cycle_and_plot(100, instructions, 30)
