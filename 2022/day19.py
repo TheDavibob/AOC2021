@@ -269,10 +269,9 @@ def evaluate_blueprint_2(
         built_so_far,
         items_so_far,
         cost_array,
+        greedy,
 ):
     best_geodes = 0
-    # if built_so_far[-1] > 0:
-    #     print(n_remaining_time, built_so_far, items_so_far)
 
     for build_next in range(3, -1, -1):
         if (build_next != 3) \
@@ -297,11 +296,15 @@ def evaluate_blueprint_2(
                 n_remaining_time - time_to_build,
                 built_so_far + np.eye(4, dtype=int)[build_next],
                 items_so_far + built_so_far * time_to_build - build_cost,
-                cost_array
+                cost_array,
+                greedy=greedy
             )
 
         if n_geodes > best_geodes:
             best_geodes = n_geodes
+
+        if greedy:
+            return best_geodes
 
     return best_geodes
 
@@ -309,7 +312,7 @@ def evaluate_blueprint_2(
 if __name__ == "__main__":
     text = common.load_todays_input(__file__)
     blueprints = []
-    for line in text.split("\n"):
+    for line in sample_input.split("\n"):
         if line == "":
             continue
         else:
@@ -342,6 +345,7 @@ if __name__ == "__main__":
             start,
             np.zeros(4, dtype=int),
             blueprint,
+            greedy=True
         )
         print(max_geodes)
         cumulative *= max_geodes
