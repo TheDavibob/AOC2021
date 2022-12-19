@@ -264,27 +264,86 @@ def theoretical_geode(
     return geode
 
 
+def evaluate_blueprint_2(
+        n_remaining_time,
+        built_so_far,
+        items_so_far,
+        cost_array,
+):
+    best_geodes = 0
+    # if built_so_far[-1] > 0:
+    #     print(n_remaining_time, built_so_far, items_so_far)
+
+    for build_next in range(3, -1, -1):
+        if (build_next != 3) \
+                and (np.max(cost_array[:, build_next]) <= built_so_far[build_next]):
+            continue
+
+        build_cost = cost_array[build_next]
+        if np.any(build_cost[built_so_far == 0]):
+            continue
+
+        remaining_materials = build_cost - items_so_far
+        time_to_build = 1
+        while np.any(remaining_materials > 0):
+            remaining_materials -= built_so_far
+            time_to_build += 1
+
+        if n_remaining_time - time_to_build <= 0:
+            items = items_so_far + n_remaining_time * built_so_far
+            n_geodes = items[-1]
+        else:
+            n_geodes = evaluate_blueprint_2(
+                n_remaining_time - time_to_build,
+                built_so_far + np.eye(4, dtype=int)[build_next],
+                items_so_far + built_so_far * time_to_build - build_cost,
+                cost_array
+            )
+
+        if n_geodes > best_geodes:
+            best_geodes = n_geodes
+
+    return best_geodes
+
+
 if __name__ == "__main__":
     text = common.load_todays_input(__file__)
     blueprints = []
-    for line in sample_input.split("\n"):
+    for line in text.split("\n"):
         if line == "":
             continue
         else:
             blueprints.append(reduce_blueprint(parse_blueprint(line)))
 
+    # start = np.zeros(4, dtype=int)
+    # start[0] = 1
+    #
+    # cumulative = 0
+    # for i, blueprint in enumerate(blueprints):
+    #     print(f"Blueprint {i+1}")
+    #     max_geodes = evaluate_blueprint_2(
+    #         24,
+    #         start,
+    #         np.zeros(4, dtype=int),
+    #         blueprint,
+    #     )
+    #     print(max_geodes)
+    #     cumulative += (i+1) * max_geodes
+    #
+    # common.part(1, cumulative)
+
+    cumulative = 1
     start = np.zeros(4, dtype=int)
     start[0] = 1
-    n_geodes, best_at_time, best_path = evaluate_blueprint(
-        24,
-        start,
-        np.zeros(4, ),
-        blueprints[0],
-        np.zeros(24, dtype=int),
-        []
-    )
-    # print(theoretical_max(24, start, np.zeros(4, dtype=int), blueprints[0]))
+    for i, blueprint in enumerate(blueprints[:3]):
+        print(f"Blueprint {i+1}")
+        max_geodes = evaluate_blueprint_2(
+            32,
+            start,
+            np.zeros(4, dtype=int),
+            blueprint,
+        )
+        print(max_geodes)
+        cumulative *= max_geodes
 
-    common.part(1, "TBC")
-
-    common.part(2, "TBC")
+    common.part(2, cumulative)
