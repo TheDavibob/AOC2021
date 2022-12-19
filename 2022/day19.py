@@ -1,4 +1,6 @@
+import dataclasses
 import functools
+from copy import deepcopy
 
 import numpy as np
 import common
@@ -13,6 +15,19 @@ ROBOT_MAPPING = {
 
 sample_input = """Blueprint 1: Each ore robot costs 4 ore. Each clay robot costs 2 ore. Each obsidian robot costs 3 ore and 14 clay. Each geode robot costs 2 ore and 7 obsidian.
 Blueprint 2: Each ore robot costs 2 ore. Each clay robot costs 3 ore. Each obsidian robot costs 3 ore and 8 clay. Each geode robot costs 3 ore and 12 obsidian."""
+
+
+@dataclasses.dataclass
+class Pointer:
+    value_to_beat: int = 0
+
+
+@dataclasses.dataclass
+class Cache:
+    lookup_dict: dict
+
+
+VALUE_TO_BEAT = Pointer(value_to_beat=0)
 
 
 def parse_blueprint(blueprint):
@@ -271,32 +286,50 @@ def theoretical_geode(
     return geode
 
 
-@functools.cache
 def evaluate_blueprint_2(
         n_remaining_time,
         built_so_far,
         items_so_far,
         cost_array,
-        max_costs,
-        value_to_beat
+        max_costs
 ):
     best_geodes = 0
 
-    print(n_remaining_time, built_so_far, items_so_far, value_to_beat)
+    # print(n_remaining_time, built_so_far, items_so_far, VALUE_TO_BEAT.value_to_beat)
 
     # Calculate theoretical maximum and short-circuit if need be
     # rem_geodes = items_so_far[-1] + built_so_far[-1] * n_remaining_time
     # poss_geodes = (n_remaining_time * n_remaining_time - 1) // 2
     # if rem_geodes + poss_geodes <= value_to_beat:
     #     return 0
-    if theoretical_max(
-            n_remaining_time,
-            built_so_far,
-            items_so_far,
-            cost_array,
-            max_costs
-    ) <= value_to_beat:
-        return 0
+    # if theoretical_max(
+    #         n_remaining_time,
+    #         built_so_far,
+    #         items_so_far,
+    #         cost_array,
+    #         max_costs
+    # ) <= VALUE_TO_BEAT.value_to_beat:
+    #     return 0
+
+    outer_state = (n_remaining_time,) + built_so_far
+    inner_state = items_so_far
+
+    if outer_state not in CACHE.lookup_dict.keys():
+        CACHE.lookup_dict[outer_state] = {}
+
+    best_so_far = CACHE.lookup_dict[outer_state].get(inner_state, None)
+
+    # if best_so_far is None:
+    #     for key, value in CACHE.lookup_dict[outer_state].items():
+    #         if np.all(np.array(items_so_far) <= np.array(key)):
+    #             # We've found a previous situation with more items built by
+    #             # this stage - discard this point
+    #             best_so_far = value
+    #             # CACHE.lookup_dict[outer_state][inner_state] = best_geodes
+    #             break
+
+    if best_so_far is not None:
+        return best_so_far
 
     built_so_far = np.array(built_so_far)
     items_so_far = np.array(items_so_far)
@@ -333,12 +366,16 @@ def evaluate_blueprint_2(
                 tuple(built_so_far + np.eye(4, dtype=int)[build_next]),
                 tuple(items_so_far + built_so_far * time_to_build - build_cost),
                 cost_array,
-                max_costs,
-                best_geodes
+                max_costs
             )
 
         if n_geodes > best_geodes:
             best_geodes = n_geodes
+
+    CACHE.lookup_dict[outer_state][inner_state] = best_geodes
+
+    # if best_geodes > VALUE_TO_BEAT.value_to_beat:
+    #     VALUE_TO_BEAT.value_to_beat = best_geodes
 
     return best_geodes
 
@@ -346,7 +383,7 @@ def evaluate_blueprint_2(
 if __name__ == "__main__":
     text = common.load_todays_input(__file__)
     blueprints = []
-    for line in sample_input.split("\n"):
+    for line in text.split("\n"):
         if line == "":
             continue
         else:
@@ -354,8 +391,12 @@ if __name__ == "__main__":
 
     cumulative = 0
     start = (1, 0, 0, 0)
+    cache_store = []
     for i, blueprint in enumerate(blueprints):
         print(f"Blueprint {i+1}")
+        VALUE_TO_BEAT.value_to_beat = 0
+        CACHE = Cache({})
+
         max_costs = tuple(
             max(blueprint[:, i]) for i in range(4)
         )
@@ -368,17 +409,20 @@ if __name__ == "__main__":
             start,
             (0, 0, 0, 0),
             cost_array,
-            max_costs,
-            0
+            max_costs
         )
         print(max_geodes)
         cumulative += (i+1) * max_geodes
+
+        cache_store.append(deepcopy(CACHE))
 
     common.part(1, cumulative)
 
     cumulative = 1
     start = (1, 0, 0, 0)
     for i, blueprint in enumerate(blueprints[:3]):
+        CACHE = Cache({})
+
         print(f"Blueprint {i+1}")
         max_costs = tuple(
             max(blueprint[:, i]) for i in range(4)
@@ -392,8 +436,7 @@ if __name__ == "__main__":
             start,
             (0, 0, 0, 0),
             cost_array,
-            max_costs,
-            0
+            max_costs
         )
         print(max_geodes)
         cumulative *= max_geodes
