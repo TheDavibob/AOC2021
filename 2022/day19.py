@@ -126,21 +126,28 @@ def evaluate_blueprint(
     return best_n_geodes, best_at_time, final_best_path
 
 
-def theoretical_max(n_remaining_steps, built_so_far, items_so_far, cost_array):
+@functools.cache
+def theoretical_max(
+        n_remaining_steps,
+        built_so_far,
+        items_so_far,
+        cost_array,
+        max_costs,
+):
     ore_max = theoretical_ore(
         n_remaining_steps,
         built_so_far[0],
         items_so_far[0],
-        cost_array[0, 0],
-        max(cost_array[:, 0])
+        cost_array[0][0],
+        max_costs[0]
     )
 
     clay_max = theoretical_clay(
         n_remaining_steps,
         built_so_far[1],
         items_so_far[1],
-        cost_array[1, 0],
-        max(cost_array[:, 1]),
+        cost_array[1][0],
+        max_costs[1],
         tuple(ore_max)
     )
 
@@ -148,9 +155,9 @@ def theoretical_max(n_remaining_steps, built_so_far, items_so_far, cost_array):
         n_remaining_steps,
         built_so_far[2],
         items_so_far[2],
-        cost_array[2, 0],
-        cost_array[2, 1],
-        max(cost_array[:, 2]),
+        cost_array[2][0],
+        cost_array[2][1],
+        max_costs[2],
         tuple(ore_max),
         tuple(clay_max)
     )
@@ -159,8 +166,8 @@ def theoretical_max(n_remaining_steps, built_so_far, items_so_far, cost_array):
         n_remaining_steps,
         built_so_far[3],
         items_so_far[3],
-        cost_array[3, 0],
-        cost_array[3, 2],
+        cost_array[3][0],
+        cost_array[3][2],
         tuple(ore_max),
         tuple(obsidian_max)
     )
@@ -271,9 +278,25 @@ def evaluate_blueprint_2(
         items_so_far,
         cost_array,
         max_costs,
-        greedy=False,
+        value_to_beat
 ):
     best_geodes = 0
+
+    print(n_remaining_time, built_so_far, items_so_far, value_to_beat)
+
+    # Calculate theoretical maximum and short-circuit if need be
+    # rem_geodes = items_so_far[-1] + built_so_far[-1] * n_remaining_time
+    # poss_geodes = (n_remaining_time * n_remaining_time - 1) // 2
+    # if rem_geodes + poss_geodes <= value_to_beat:
+    #     return 0
+    if theoretical_max(
+            n_remaining_time,
+            built_so_far,
+            items_so_far,
+            cost_array,
+            max_costs
+    ) <= value_to_beat:
+        return 0
 
     built_so_far = np.array(built_so_far)
     items_so_far = np.array(items_so_far)
@@ -281,6 +304,14 @@ def evaluate_blueprint_2(
     for build_next in range(3, -1, -1):
         if (build_next != 3) \
                 and (max_costs[build_next] <= built_so_far[build_next]):
+            continue
+
+        # Sometimes there is no point building the factory - we already have
+        # enough to use arbitrarily
+        if (build_next != 3) and (
+                items_so_far[build_next]
+                + n_remaining_time * built_so_far[build_next]
+        ) // max_costs[build_next] >= n_remaining_time:
             continue
 
         build_cost = np.array(cost_array[build_next])
@@ -303,14 +334,11 @@ def evaluate_blueprint_2(
                 tuple(items_so_far + built_so_far * time_to_build - build_cost),
                 cost_array,
                 max_costs,
-                greedy=greedy
+                best_geodes
             )
 
         if n_geodes > best_geodes:
             best_geodes = n_geodes
-
-        if greedy:
-            return best_geodes
 
     return best_geodes
 
@@ -340,7 +368,8 @@ if __name__ == "__main__":
             start,
             (0, 0, 0, 0),
             cost_array,
-            max_costs
+            max_costs,
+            0
         )
         print(max_geodes)
         cumulative += (i+1) * max_geodes
@@ -364,7 +393,7 @@ if __name__ == "__main__":
             (0, 0, 0, 0),
             cost_array,
             max_costs,
-            greedy=False
+            0
         )
         print(max_geodes)
         cumulative *= max_geodes
