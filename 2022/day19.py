@@ -9,6 +9,10 @@ ROBOT_MAPPING = {
 }
 
 
+sample_input = """Blueprint 1: Each ore robot costs 4 ore. Each clay robot costs 2 ore. Each obsidian robot costs 3 ore and 14 clay. Each geode robot costs 2 ore and 7 obsidian.
+Blueprint 2: Each ore robot costs 2 ore. Each clay robot costs 3 ore. Each obsidian robot costs 3 ore and 8 clay. Each geode robot costs 3 ore and 12 obsidian."""
+
+
 def parse_blueprint(blueprint):
     robots = blueprint[:-1].split(": ")[1]
     robots = robots.split(". ")
@@ -42,6 +46,8 @@ def reduce_blueprint(blueprint):
 
 def evaluate_blueprint(n_remaining_steps, built_so_far, items_so_far, cost_array):
     # Process the current minute
+    print(n_remaining_steps, built_so_far, items_so_far)
+
     new_items = np.zeros(4, dtype=int)
     for idx, (i, b) in enumerate(zip(items_so_far, built_so_far)):
         new_items[idx] = i + b
@@ -49,11 +55,26 @@ def evaluate_blueprint(n_remaining_steps, built_so_far, items_so_far, cost_array
     if n_remaining_steps == 1:
         return new_items[-1]
 
+    if n_remaining_steps ** 2 + items_so_far[2] < cost_array[3, 2]:
+        # We cannot get enough obsidian to build a new geode thing
+        # FIX THIS - is a good heuristic
+
+        # Idea: compute the maximum possible of each item that could
+        # be mined, if a new extractor was built every sample
+        # If say, cannot mine enough obsidian to make any geodes,
+        # just compute the final answer (i.e. geode mines * rem time + geodes)
+        # If say, cannot mine enough clay to make any more obsidian,
+        # trim the obsidian max (to obsidian mines * rem_time + obsidian) and repeat.
+        # Feasibly could do same for clay, but this gets messy.
+        return new_items[-1]
+
     can_build = []
     for rob_idx in range(4):
         cost_line = cost_array[rob_idx]
-        if np.all(cost_line <= new_items):
+        if np.all(cost_line <= items_so_far):
             can_build.append(rob_idx)
+
+    can_build = can_build[::-1]
 
     if (2 not in can_build) or (3 not in can_build):
         best_n_geodes = evaluate_blueprint(
@@ -62,6 +83,11 @@ def evaluate_blueprint(n_remaining_steps, built_so_far, items_so_far, cost_array
             new_items,
             cost_array
         )
+    else:
+        best_n_geodes = 0
+
+    if 3 in can_build:
+        can_build = [3]
 
     for idx in can_build:
         new_built_so_far = built_so_far.copy()
@@ -83,7 +109,7 @@ def evaluate_blueprint(n_remaining_steps, built_so_far, items_so_far, cost_array
 if __name__ == "__main__":
     text = common.load_todays_input(__file__)
     blueprints = []
-    for line in text.split("\n"):
+    for line in sample_input.split("\n"):
         if line == "":
             continue
         else:
