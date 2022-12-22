@@ -83,10 +83,11 @@ def iterate(instructions):
 
 
 def part_two(instructions):
+    # In this, the numbers are represented as rational multiples of the human value
+    # plus any known constants
     variables = {}
     paused_instructions = []
     root = None
-    humn = sympy.symbols("humn")
     for instruction in instructions:
         done_instructions = []
         for paused_instruction in paused_instructions:
@@ -99,16 +100,9 @@ def part_two(instructions):
             arg1 = variables[paused_instruction[2][1]]
 
             if paused_instruction[0] == "root":
-                return arg0 == arg1
+                return arg0, arg1
 
-            if paused_instruction[1] == "+":
-                variables[paused_instruction[0]] = arg0 + arg1
-            elif paused_instruction[1] == "-":
-                variables[paused_instruction[0]] = arg0 - arg1
-            elif paused_instruction[1] == "*":
-                variables[paused_instruction[0]] = arg0 * arg1
-            elif paused_instruction[1] == "/":
-                variables[paused_instruction[0]] = arg0 // arg1
+            variables[paused_instruction[0]] = evaluate_instruction(paused_instruction, arg0, arg1)
 
             done_instructions.append(paused_instruction)
 
@@ -117,9 +111,9 @@ def part_two(instructions):
 
         if instruction[1] == "=":
             if instruction[0] == "humn":
-                variables["humn"] = humn
+                variables["humn"] = ((1, 1), 0)
             else:
-                variables[instruction[0]] = instruction[2]
+                variables[instruction[0]] = ((0, 1), instruction[2])
         else:
             if instruction[2][0] not in variables.keys():
                 paused_instructions.append(instruction)
@@ -132,16 +126,9 @@ def part_two(instructions):
             arg1 = variables[instruction[2][1]]
 
             if instruction[0] == "root":
-                return arg0 == arg1
+                return arg0, arg1
 
-            if instruction[1] == "+":
-                variables[instruction[0]] = arg0 + arg1
-            elif instruction[1] == "-":
-                variables[instruction[0]] = arg0 - arg1
-            elif instruction[1] == "*":
-                variables[instruction[0]] = arg0 * arg1
-            elif instruction[1] == "/":
-                variables[instruction[0]] = arg0 // arg1
+            variables[instruction[0]] = evaluate_instruction(instruction, arg0, arg1)
 
     root = variables.get("root", None)
     while root is None:
@@ -156,16 +143,9 @@ def part_two(instructions):
             arg1 = variables[paused_instruction[2][1]]
 
             if paused_instruction[0] == "root":
-                return arg0 == arg1
+                return arg0, arg1
 
-            if paused_instruction[1] == "+":
-                variables[paused_instruction[0]] = arg0 + arg1
-            elif paused_instruction[1] == "-":
-                variables[paused_instruction[0]] = arg0 - arg1
-            elif paused_instruction[1] == "*":
-                variables[paused_instruction[0]] = arg0 * arg1
-            elif paused_instruction[1] == "/":
-                variables[paused_instruction[0]] = arg0 // arg1
+            variables[paused_instruction[0]] = evaluate_instruction(paused_instruction, arg0, arg1)
 
             done_instructions.append(paused_instruction)
 
@@ -173,6 +153,58 @@ def part_two(instructions):
             paused_instructions.remove(done)
 
     return root
+
+
+def evaluate_instruction(instruction, arg0, arg1):
+    if arg0[0][0] != 0:
+        ...
+
+    if arg1[0][0] != 0:
+        ...
+
+    if instruction[1] == "+":
+        out = (
+            (
+                arg0[0][0] * arg1[0][1] + arg1[0][0] * arg0[0][1],
+                arg1[0][1] * arg0[0][1]
+            ),
+            arg0[1] + arg1[1]
+        )
+    elif instruction[1] == "-":
+        out = (
+            (
+                arg0[0][0] * arg1[0][1] - arg1[0][0] * arg0[0][1],
+                arg1[0][1] * arg0[0][1]
+            ),
+            arg0[1] - arg1[1]
+        )
+    elif instruction[1] == "*":
+        if arg1[0][0] == 0:
+            out = (
+                (arg0[0][0] * arg1[1], arg0[0][1]),
+                arg0[1] * arg1[1]
+            )
+        elif arg0[0][0] == 0:
+            out = (
+                (arg1[0][0] * arg0[1], arg1[0][1]),
+                arg0[1] * arg1[1]
+            )
+        else:
+            raise ValueError("Strange mulitplicand")
+    elif instruction[1] == "/":
+        assert arg1[0][0] == 0
+        out = (
+            (arg0[0][0], arg0[0][1] * arg1[1]),
+            arg0[1] // arg1[1]
+        )
+
+    if out[0][0] == 0:
+        out = ((0, 1), out[1])
+
+    if out[0] != (0, 1):
+        print(out)
+
+    return out
 
 
 example = """root: pppw + sjmn
@@ -196,14 +228,8 @@ if __name__ == "__main__":
     text = common.load_todays_input(__file__)
     instructions = parse_input(text)
     root = iterate(instructions)
-
     common.part(1, root)
 
-    # for i in tqdm(range(100)):
-    #     root = part_two(instructions, i)
-    #     if root:
-    #         break
-
-    part_two(instructions)
-
-    # common.part(2, i)
+    arg0, arg1 = part_two(instructions)
+    # This gives a/b * humn + c = d, so solve. We know that arg1[0] = (0, 1)
+    common.part(2, (arg1[1] - arg0[1]) * arg0[0][1] // arg0[0][0])
