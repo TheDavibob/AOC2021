@@ -53,9 +53,13 @@ def get_next_point(current_point, delta, chart):
     return next_point, delta
 
 
-def step_n(current_point, delta, n, chart):
+def step_n(current_point, delta, n, chart, part_two=False):
     for _ in range(n):
-        next_point, delta = get_next_point(current_point, delta, chart)
+        if not part_two:
+            next_point, delta = get_next_point(current_point, delta, chart)
+        else:
+            next_point, delta = next_step_cube(current_point, delta, chart)
+
         if chart[next_point] == 1:
             break
 
@@ -75,7 +79,8 @@ def turn_left(delta):
 def turn_right(delta):
     return tuple(RIGHT_TURN @ delta)
 
-def follow_instructions(instructions, chart):
+
+def follow_instructions(instructions, chart, part_two=False):
     direction = (0, 1)
 
     current_point, direction = get_next_point((0, 0), direction, chart)
@@ -83,10 +88,20 @@ def follow_instructions(instructions, chart):
     for instruction in instructions:
         if instruction == "L":
             direction = turn_left(direction)
+            print(f"Turned L to face {DIR_MAP[direction]}")
         elif instruction == "R":
             direction = turn_right(direction)
+            print(f"Turned R to face {DIR_MAP[direction]}")
         else:
-            current_point, direction = step_n(current_point, direction, instruction, chart)
+            current_point, direction = step_n(
+                current_point,
+                direction,
+                instruction,
+                chart,
+                part_two=part_two
+            )
+            print(f"Stepped {instruction} points to {current_point}, now facing"
+                  f" {DIR_MAP[direction]}")
 
     return current_point, direction
 
@@ -169,7 +184,9 @@ LEFT_ROTATION = {
     ">": "^"
 }
 
+
 RIGHT_ROTATION = {v: k for k, v in LEFT_ROTATION.items()}
+
 
 FLIP = {
     "^": "v",
@@ -199,10 +216,18 @@ def next_step_cube(current_point, delta, chart):
         point_in_new_region = next_point_in_region
         new_delta = delta
     elif new_direction == LEFT_ROTATION[direction_as_char]:
-        point_in_new_region = (49 - next_point_in_region[1], 49 - next_point_in_region[0])
+        point_in_new_region = turn_left(next_point_in_region)
+        point_in_new_region = (
+            point_in_new_region[0] % 49,
+            point_in_new_region[1] % 49
+        )
         new_delta = turn_left(delta)
     elif new_direction == RIGHT_ROTATION[direction_as_char]:
-        point_in_new_region = (next_point_in_region[1], next_point_in_region[0])
+        point_in_new_region = turn_right(next_point_in_region)
+        point_in_new_region = (
+            point_in_new_region[0] % 49,
+            point_in_new_region[1] % 49
+        )
         new_delta = turn_right(delta)
     elif new_direction == FLIP[direction_as_char]:
         point_in_new_region = (49 - next_point_in_region[0], 49-next_point_in_region[1])
@@ -211,6 +236,7 @@ def next_step_cube(current_point, delta, chart):
         raise ValueError("Direction mismatch")
 
     new_point = get_point_from_region(point_in_new_region, new_region, chart)
+    print(f"Proposed point: {new_point}")
     return new_point, new_delta
 
 
@@ -247,9 +273,9 @@ if __name__ == "__main__":
     # plt.show()
 
     # final_loc, final_dir = follow_instructions(instructions, chart)
-
+    #
     # common.part(1, 1000*(final_loc[0]+1) + 4*(final_loc[1]+1) + VALUE[final_dir])
 
-    get_region((0, 149), chart)
+    final_loc, final_dir = follow_instructions(instructions, chart, part_two=True)
 
-    common.part(2, "TBC")
+    common.part(2, 1000*(final_loc[0]+1) + 4*(final_loc[1]+1) + VALUE[final_dir])
