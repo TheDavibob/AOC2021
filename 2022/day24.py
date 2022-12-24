@@ -114,6 +114,21 @@ class Cache:
     lookup: dict
 
 
+def arrays_at_n(initial_arrays, n, array_cache):
+    cache_state = n
+    if (cached := array_cache.lookup.get(cache_state, None)) is not None:
+        return cached
+
+    if n == 0:
+        return initial_arrays
+
+    prev_arrays = arrays_at_n(initial_arrays, n-1, array_cache)
+    current_array = step_arrays_2(prev_arrays)
+    array_cache.lookup[cache_state] = current_array
+
+    return current_array
+
+
 def len_to_exit(current_position, end_position, arrays, current_distance, best_so_far, cache):
     if current_distance >= best_so_far.value:
         return 0
@@ -165,7 +180,7 @@ def from_start(arrays, entry_exit):
     return len_to_exit(start_postition, end_position, arrays, 0, best_so_far, Cache(lookup={}))
 
 
-def len_to_exit_2(current_position, targets, arrays, current_distance, best_so_far, cache, pref_orders):
+def len_to_exit_2(current_position, targets, initial_arrays, current_distance, best_so_far, cache, pref_orders, array_cache):
     manhattan_remaining = np.sum(np.abs(current_position - targets[0]))
     for t0, t1 in zip(targets[:-1], targets[1:]):
         manhattan_remaining += np.sum(np.abs(t0 - t1))
@@ -188,7 +203,8 @@ def len_to_exit_2(current_position, targets, arrays, current_distance, best_so_f
     else:
         new_targets = targets
 
-    next_blizzard = step_arrays_2(arrays)
+    next_blizzard = arrays_at_n(initial_arrays, current_distance + 1, array_cache)
+
     options = all_moves(current_position, next_blizzard, pref_orders[0])
     if len(options) == 0:
         return -1
@@ -196,7 +212,16 @@ def len_to_exit_2(current_position, targets, arrays, current_distance, best_so_f
     best_distance = -1
     for option in options:
         new_position = current_position + DIR_NAMES[option]
-        distance = len_to_exit_2(new_position, new_targets, next_blizzard, current_distance + 1, best_so_far, cache, pref_orders)
+        distance = len_to_exit_2(
+            new_position,
+            new_targets,
+            initial_arrays,
+            current_distance + 1,
+            best_so_far,
+            cache,
+            pref_orders,
+            array_cache
+        )
         if distance > -1:
             if best_distance == -1:
                 best_distance = distance + 1
@@ -208,7 +233,7 @@ def len_to_exit_2(current_position, targets, arrays, current_distance, best_so_f
     return best_distance
 
 
-def from_start_to_end_to_start(arrays, entry_exit):
+def multiple_targets(arrays, entry_exit, sequence):
     start_postition = np.array(entry_exit[0], dtype=int) + 1
     end_position = np.array(entry_exit[1], dtype=int) + 1
     for dir, array in arrays.items():
@@ -224,25 +249,38 @@ def from_start_to_end_to_start(arrays, entry_exit):
 
     best_so_far = Pointer(value=1500)
 
+    sequence_of_pos = []
+    sequence_of_order = []
+    for s in sequence:
+        if s == "e":
+            sequence_of_pos.append(end_position)
+            sequence_of_order.append("DRLWU")
+        elif s == "s":
+            sequence_of_pos.append(start_postition)
+            sequence_of_order.append("ULRWD")
+
+    path_cache = Cache(lookup={})
+    blizzard_cache = Cache(lookup={})
+
     return len_to_exit_2(
         start_postition,
-        [end_position, start_postition, end_position],
+        sequence_of_pos,
         arrays,
         0,
         best_so_far,
-        Cache(lookup={}),
-        ["DRLWU", "ULRWD", "DRLWU"]
-    )
+        path_cache,
+        sequence_of_order,
+        blizzard_cache
+    ), path_cache, blizzard_cache
 
 
 if __name__ == "__main__":
     text = common.load_todays_input(__file__)
     arrays, entry_exit = parse_input(text)
 
-    # distance = from_start(arrays, entry_exit)
-    #
-    # common.part(1, distance)
-
     sys.setrecursionlimit(1600)
-    distance = from_start_to_end_to_start(arrays, entry_exit)
-    common.part(2, distance)
+    distance, paths, blizzards = multiple_targets(arrays, entry_exit, "e")
+    common.part(1, distance)
+
+    # distance, paths, blizzards = multiple_targets(arrays, entry_exit, "ese")
+    # common.part(2, distance)
