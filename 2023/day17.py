@@ -21,22 +21,28 @@ class ShortestPathFinder:
 
         self.memo_dict = {}
 
-    def shortest_path(self, location, prev_direction, prev_in_direction):
+    def shortest_path(self, location, prev_direction, prev_in_direction, visited_before):
         memoised_path = self.memo_dict.get((location, prev_direction, prev_in_direction), None)
         if memoised_path is not None:
             return memoised_path
 
-        print(location)
+        if ((location, prev_direction, prev_in_direction)) in visited_before:
+            return float('inf')
+
+        # This is *branch* specific, to prevent loops
+        visited_before.append((location, prev_direction, prev_in_direction))
 
         if location == self.lower_corner:
+            print(visited_before)
+            self.memo_dict[(location, prev_direction, prev_in_direction)] = self.grid[location]
             return self.grid[location]
 
         if prev_direction in ["L", "R"]:
             new_directions = ["U", "D"]
         elif prev_direction in ["U", "D"]:
             new_directions = ["L", "R"]
-        elif prev_direction == "N":
-            new_directions = ["L", "R", "U", "D"]
+        # elif prev_direction == "N":
+        #     new_directions = ["L", "R", "U", "D"]
         else:
             raise ValueError(f"Direction {prev_direction} not understood.")
 
@@ -48,7 +54,7 @@ class ShortestPathFinder:
             if direction == prev_direction:
                 new_prev_in_dir = prev_in_direction + 1
             else:
-                new_prev_in_dir = 0
+                new_prev_in_dir = 1
 
             if direction == "R":
                 if location[1] + 1 >= self.grid.shape[1]:
@@ -64,13 +70,13 @@ class ShortestPathFinder:
                     continue
                 new_location = (location[0] - 1, location[1])
             elif direction == "D":
-                if location[1] + 1 >= self.grid.shape[1]:
+                if location[0] + 1 >= self.grid.shape[0]:
                     continue
                 new_location = (location[0] + 1, location[1])
             else:
                 raise ValueError(f"Direction {direction} not understood")
 
-            new_path = self.shortest_path(new_location, direction, new_prev_in_dir)
+            new_path = self.shortest_path(new_location, direction, new_prev_in_dir, visited_before)
 
             best_new_path = min(new_path, best_new_path)
 
@@ -80,7 +86,10 @@ class ShortestPathFinder:
 
         return total_path
 
-
+    def run(self):
+        path_one = self.shortest_path((0, 1), "R", 1, [])
+        path_two = self.shortest_path((1, 0), "D", 1, [])
+        return min(path_one, path_two)
 
 
 
@@ -105,4 +114,4 @@ if __name__ == "__main__":
     demo_grid = parse_input(demo_text)
 
     spf = ShortestPathFinder(demo_grid)
-    spf.shortest_path((0, 0), "N", 3)
+    print(spf.run())
