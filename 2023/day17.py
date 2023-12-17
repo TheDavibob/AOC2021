@@ -1,4 +1,5 @@
 import functools
+from collections import deque
 
 import numpy as np
 from tqdm import tqdm
@@ -30,7 +31,7 @@ class ShortestPathFinder:
             return float('inf')
 
         # This is *branch* specific, to prevent loops
-        visited_before.append((location, prev_direction, prev_in_direction))
+        visited_before = visited_before + [(location, prev_direction, prev_in_direction)]
 
         if location == self.lower_corner:
             print(visited_before)
@@ -92,6 +93,79 @@ class ShortestPathFinder:
         return min(path_one, path_two)
 
 
+# Grid approach - the one above didn't work
+DIRECTIONS = ["U", "D", "L", "R"]
+
+
+def find_neighbours(location, grid_shape):
+    # location is a 4-vector: x, y, entry_dir, count
+    x, y, entry_dir, count = location
+    if entry_dir == 0:  # U
+        prev_x, prev_y = x+1, y
+    elif entry_dir == 1:  # D
+        prev_x, prev_y = x-1, y
+    elif entry_dir == 2:  # L
+        prev_x, prev_y = x, y+1
+    elif entry_dir == 3:  # R
+        prev_x, prev_y = x, y-1
+    else:
+        raise ValueError(f"Entry direction {entry_dir} not understood")
+
+    if prev_x < 0 or prev_x >= grid_shape[0]:
+        return []
+
+    if prev_y < 0 or prev_y >= grid_shape[1]:
+        return []
+
+    if count > 0:  # awkwardly zero indexed
+        prev_counts = [count - 1]
+        prev_dirs = [entry_dir]
+    else:
+        prev_counts = [0, 1, 2]  # i.e. any, it changed direction
+        if entry_dir in [0, 1]:
+            prev_dirs = [2, 3]
+        elif entry_dir in [2, 3]:
+            prev_dirs = [0, 1]
+        else:
+            raise ValueError(f"Entry direction {entry_dir} not understood")
+
+    neighbours = []
+    for prev_dir in prev_dirs:
+        for prev_count in prev_counts:
+            neighbours.append((prev_x, prev_y, prev_dir, prev_count))
+
+    return neighbours
+
+
+def dijkstra_ish(grid):
+    distance_grid = np.sum(grid) * np.ones(grid.shape + (4, 3), dtype=int)
+    distance_grid[-1, -1] = 0
+
+    end_point = grid.shape[0] - 1, grid.shape[1] - 1
+
+    frontier = deque(end_point + (i, j) for i in range(4) for j in range(3))
+
+    resolved_points = []
+    while len(frontier) > 0:
+        test_point = frontier.popleft()
+
+        new_value = distance_grid[test_point] + grid[test_point[:2]]
+        neighbours = find_neighbours(test_point, grid.shape)
+        for neighbour in neighbours:
+            # if neighbour in resolved_points:
+            #     continue
+
+            if (neighbour not in frontier) and (neighbour not in resolved_points):
+                frontier.append(neighbour)
+
+            if neighbour == (2, 9, 3, 0):
+                print(test_point, new_value)
+            distance_grid[neighbour] = min(distance_grid[neighbour], new_value)
+
+        resolved_points.append(test_point)
+
+    return distance_grid
+
 
 if __name__ == "__main__":
     text = common.import_file("input/day17")
@@ -113,5 +187,4 @@ if __name__ == "__main__":
 
     demo_grid = parse_input(demo_text)
 
-    spf = ShortestPathFinder(demo_grid)
-    print(spf.run())
+    distance_grid = dijkstra_ish(demo_grid)
