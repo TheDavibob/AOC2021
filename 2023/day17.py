@@ -14,90 +14,11 @@ def parse_input(text):
     )
 
 
-class ShortestPathFinder:
-    def __init__(self, grid):
-        self.grid = grid
-
-        self.lower_corner = (grid.shape[0]-1, grid.shape[1]-1)
-
-        self.memo_dict = {}
-
-    def shortest_path(self, location, prev_direction, prev_in_direction, visited_before):
-        memoised_path = self.memo_dict.get((location, prev_direction, prev_in_direction), None)
-        if memoised_path is not None:
-            return memoised_path
-
-        if ((location, prev_direction, prev_in_direction)) in visited_before:
-            return float('inf')
-
-        # This is *branch* specific, to prevent loops
-        visited_before = visited_before + [(location, prev_direction, prev_in_direction)]
-
-        if location == self.lower_corner:
-            print(visited_before)
-            self.memo_dict[(location, prev_direction, prev_in_direction)] = self.grid[location]
-            return self.grid[location]
-
-        if prev_direction in ["L", "R"]:
-            new_directions = ["U", "D"]
-        elif prev_direction in ["U", "D"]:
-            new_directions = ["L", "R"]
-        # elif prev_direction == "N":
-        #     new_directions = ["L", "R", "U", "D"]
-        else:
-            raise ValueError(f"Direction {prev_direction} not understood.")
-
-        if prev_in_direction < 3:
-            new_directions.append(prev_direction)
-
-        best_new_path = float('inf')
-        for direction in new_directions:
-            if direction == prev_direction:
-                new_prev_in_dir = prev_in_direction + 1
-            else:
-                new_prev_in_dir = 1
-
-            if direction == "R":
-                if location[1] + 1 >= self.grid.shape[1]:
-                    continue
-
-                new_location = (location[0], location[1] + 1)
-            elif direction == "L":
-                if location[1] - 1 < 0:
-                    continue
-                new_location = (location[0], location[1] - 1)
-            elif direction == "U":
-                if location[0] - 1 < 0:
-                    continue
-                new_location = (location[0] - 1, location[1])
-            elif direction == "D":
-                if location[0] + 1 >= self.grid.shape[0]:
-                    continue
-                new_location = (location[0] + 1, location[1])
-            else:
-                raise ValueError(f"Direction {direction} not understood")
-
-            new_path = self.shortest_path(new_location, direction, new_prev_in_dir, visited_before)
-
-            best_new_path = min(new_path, best_new_path)
-
-        total_path = best_new_path + self.grid[location]
-
-        self.memo_dict[(location, prev_direction, prev_in_direction)] = total_path
-
-        return total_path
-
-    def run(self):
-        path_one = self.shortest_path((0, 1), "R", 1, [])
-        path_two = self.shortest_path((1, 0), "D", 1, [])
-        return min(path_one, path_two)
-
-
 # Grid approach - the one above didn't work
 DIRECTIONS = ["U", "D", "L", "R"]
 
 
-def find_neighbours(location, grid_shape):
+def find_prev_neighbours(location, grid_shape):
     # location is a 4-vector: x, y, entry_dir, count
     x, y, entry_dir, count = location
     if entry_dir == 0:  # U
@@ -137,33 +58,109 @@ def find_neighbours(location, grid_shape):
     return neighbours
 
 
-def dijkstra_ish(grid):
-    distance_grid = np.sum(grid) * np.ones(grid.shape + (4, 3), dtype=int)
+def find_prev_neighbours_2(location, grid_shape):
+    # location is a 4-vector: x, y, entry_dir, count
+    x, y, entry_dir, count = location
+    if entry_dir == 0:  # U
+        prev_x, prev_y = x+1, y
+    elif entry_dir == 1:  # D
+        prev_x, prev_y = x-1, y
+    elif entry_dir == 2:  # L
+        prev_x, prev_y = x, y+1
+    elif entry_dir == 3:  # R
+        prev_x, prev_y = x, y-1
+    else:
+        raise ValueError(f"Entry direction {entry_dir} not understood")
+
+    if prev_x < 0 or prev_x >= grid_shape[0]:
+        return []
+
+    if prev_y < 0 or prev_y >= grid_shape[1]:
+        return []
+
+    if count > 0:  # i.e. didn't turn previously
+        prev_counts = [count - 1]
+        prev_dirs = [entry_dir]
+    else:
+        prev_counts = [3, 4, 5, 6, 7, 8, 9]  # i.e. any, it changed direction
+        if entry_dir in [0, 1]:
+            prev_dirs = [2, 3]
+        elif entry_dir in [2, 3]:
+            prev_dirs = [0, 1]
+        else:
+            raise ValueError(f"Entry direction {entry_dir} not understood")
+
+    neighbours = []
+    for prev_dir in prev_dirs:
+        for prev_count in prev_counts:
+            neighbours.append((prev_x, prev_y, prev_dir, prev_count))
+
+    return neighbours
+
+
+def dijkstra_ish(grid, neighbour_fun=find_prev_neighbours, n_steps=(0, 3)):
+    dummy_val = np.sum(grid)
+    distance_grid = dummy_val * np.ones(grid.shape + (4, n_steps[1]), dtype=int)
     distance_grid[-1, -1] = 0
 
     end_point = grid.shape[0] - 1, grid.shape[1] - 1
 
-    frontier = deque(end_point + (i, j) for i in range(4) for j in range(3))
+    # frontier = [end_point + (i, j) for i in range(4) for j in range(*n_steps)]
+    frontier = np.zeros(distance_grid.shape, dtype=bool)
+    frontier[-1, -1, :, tuple(range(*n_steps))] = True
+    n_frontier = np.sum(frontier)
 
-    resolved_points = []
-    while len(frontier) > 0:
-        test_point = frontier.popleft()
+    # resolved_points = []
+    resolved_points = np.zeros(distance_grid.shape, dtype=bool)
+    n_resolved = 0
+
+    total_points_to_resolve = grid.shape[0] * grid.shape[1] * n_steps[1] * 4
+    while n_frontier > 0:
+        if (total_points_to_resolve - n_resolved) % 100 == 0:
+            print(f"\r{total_points_to_resolve - n_resolved}", end="")
+
+        # array_front = np.where(frontier)
+        # distance_at_trials = distance_grid[
+        #     array_front[:, 0],
+        #     array_front[:, 1],
+        #     array_front[:, 2],
+        #     array_front[:, 3],
+        # ]
+        # distance_at_trials = distance_grid[array_front]
+
+        # test_point = frontier[np.argmin(distance_at_trials)]
+        test_point = tuple(np.argwhere(frontier)[np.argmin(distance_grid[frontier])])
+
+        # test_point = None
+        # best_val = dummy_val
+        # for point in frontier:
+        #     if distance_grid[point] < best_val:
+        #         test_point = point
+        #         best_val = distance_grid[point]
+        # if test_point is None:
+        #     break
+
+        # frontier.remove(test_point)
+        frontier[test_point] = False
+        n_frontier -= 1
 
         new_value = distance_grid[test_point] + grid[test_point[:2]]
-        neighbours = find_neighbours(test_point, grid.shape)
+        neighbours = neighbour_fun(test_point, grid.shape)
         for neighbour in neighbours:
-            # if neighbour in resolved_points:
-            #     continue
+            if resolved_points[neighbour]:
+                continue
 
-            if (neighbour not in frontier) and (neighbour not in resolved_points):
-                frontier.append(neighbour)
-
-            if neighbour == (2, 9, 3, 0):
-                print(test_point, new_value)
             distance_grid[neighbour] = min(distance_grid[neighbour], new_value)
+            if not frontier[neighbour]:
+                n_frontier += 1
+                frontier[neighbour] = True
+            # if neighbour not in frontier:
+                # frontier.append(neighbour)
 
-        resolved_points.append(test_point)
+        n_resolved += 1
+        resolved_points[test_point] = True
 
+    print("\rDone")
     return distance_grid
 
 
@@ -188,3 +185,23 @@ if __name__ == "__main__":
     demo_grid = parse_input(demo_text)
 
     distance_grid = dijkstra_ish(demo_grid)
+    common.part(1, np.min(distance_grid[0, 0]))
+
+    distance_grid = dijkstra_ish(demo_grid, neighbour_fun=find_prev_neighbours_2, n_steps=(3, 10))
+    common.part(2, np.min(distance_grid[0, 0]))
+
+    demo_text_2 = """111111111111
+999999999991
+999999999991
+999999999991
+999999999991"""
+
+    demo_grid_2 = parse_input(demo_text_2)
+    distance_grid = dijkstra_ish(demo_grid_2, neighbour_fun=find_prev_neighbours_2, n_steps=(3, 10))
+    common.part(2, np.min(distance_grid[0, 0]))
+
+    # distance_grid = dijkstra_ish(grid)
+    # common.part(1, np.min(distance_grid[0, 0]))
+
+    distance_grid = dijkstra_ish(grid, neighbour_fun=find_prev_neighbours_2, n_steps=(3, 10))
+    common.part(2, np.min(distance_grid[0, 0]))  # This isn't quite right
