@@ -1,4 +1,5 @@
 import numpy as np
+from matplotlib import pyplot as plt
 
 import common
 
@@ -30,7 +31,6 @@ def reparse_input(parsed_input):
         new_input.append((direction, length, None))
 
     return new_input
-
 
 
 def draw_edge(input):
@@ -118,6 +118,45 @@ def fill_outside(array):
     return outside_map
 
 
+def draw_edge_on_array_squeezed(input):
+    all_points, all_segments = draw_edge(input)
+
+    unique_x = sorted(list(set(x[0] for x in all_points)))
+    unique_y = sorted(list(set(x[1] for x in all_points)))
+
+    shifted_points = [
+        (2*unique_x.index(point[0]), 2*unique_y.index(point[1]))
+        for point in all_points
+    ]
+
+    array = np.zeros((2*len(unique_x)-1, 2*len(unique_y)-1))
+
+    for point_from, point_to in zip(shifted_points[:-1], shifted_points[1:]):
+        if point_from[0] == point_to[0]:
+            array[point_from[0], min(point_from[1], point_to[1]):max(point_from[1], point_to[1])+1] = 1
+        elif point_from[1] == point_to[1]:
+            array[min(point_from[0], point_to[0]):max(point_from[0], point_to[0])+1, point_from[1]] = 1
+        else:
+            raise ValueError("Line doesn't appear to be flat")
+
+    weight_map = np.zeros((len(unique_x)-1, len(unique_y)-1), dtype=np.uint64)
+    for i in range(weight_map.shape[0]):
+        for j in range(weight_map.shape[1]):
+            x_from = unique_x[i]
+            x_to = unique_x[i + 1]
+
+            y_from = unique_y[j]
+            y_to = unique_y[j + 1]
+
+            area = abs(x_to - x_from) * abs(y_to - y_from)
+
+            weight_map[i, j] = area
+
+    padded_array = np.zeros((array.shape[0] + 2, array.shape[1] + 2))
+    padded_array[1:-1, 1:-1] = array
+    return padded_array, weight_map
+
+
 if __name__ == "__main__":
     text = common.import_file("input/day18")
 
@@ -136,12 +175,26 @@ U 3 (#a77fa3)
 L 2 (#015232)
 U 2 (#7a21e3)"""
 
+    # parsed_input = parse_input(demo_text)
     parsed_input = parse_input(text)
-    array = draw_edge_on_array(parsed_input)
-    outside_map = fill_outside(array)
-    common.part(1, outside_map.shape[0] * outside_map.shape[1] - np.sum(outside_map))
+
+    # Part 1
+    # array = draw_edge_on_array(parsed_input)
+    # outside_map = fill_outside(array)
+    # common.part(1, outside_map.shape[0] * outside_map.shape[1] - np.sum(outside_map))
 
     new_input = reparse_input(parsed_input)
-    array = draw_edge_on_array(new_input)
+    array, weight_map = draw_edge_on_array_squeezed(new_input)
     outside_map = fill_outside(array)
-    common.part(2, outside_map.shape[0] * outside_map.shape[1] - np.sum(outside_map))
+
+    # Here follows hacky shit
+    plt.matshow(array)
+    inside_cells = ~outside_map[2:-2:2, 2:-2:2]
+    cell_sum = np.sum(inside_cells * weight_map)
+    all_points, all_segments = draw_edge(new_input)
+    all_path_lengths = 0
+    for point_from, point_to in zip(all_points[:-1], all_points[1:]):
+        length_to_remove = np.abs(point_from[0] - point_to[0]) + np.abs(point_from[1] - point_to[1])
+        all_path_lengths += length_to_remove
+
+    common.part(2, int(cell_sum) + all_path_lengths // 2 + 1)
