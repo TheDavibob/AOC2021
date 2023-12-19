@@ -70,49 +70,39 @@ def step_part(workflow_map, part):
 def step_workflow_range(workflow, parts_map, workflow_map):
     for condition, destination in workflow_map[workflow]:
         parts_in_workflow = parts_map[workflow]
-        if condition is None:
-            to_map = parts_in_workflow
-            keep_map = None
-        elif condition[1] == ">":
-            to_map = copy(parts_in_workflow)
-            keep_map = copy(parts_in_workflow)
+        destination_cubes = []
+        origin_cubes = []
 
-            split = split_intervals(
-                parts_in_workflow[condition[0]],
-                condition[2]
-            )
+        for hypercube in parts_in_workflow:
 
-            to_map[condition[0]] = split[1]
-            keep_map[condition[0]] = split[0]
+            if condition is None:
+                destination_cubes.append(hypercube)
+            elif condition[1] == ">":
+                split = split_hypercube(
+                    hypercube,
+                    condition[0],
+                    condition[2]
+                )
+                destination_cubes.append(split[1])
+                origin_cubes.append(split[0])
 
-        elif condition[1] == "<":
-            to_map = copy(parts_in_workflow)
-            keep_map = copy(parts_in_workflow)
+            elif condition[1] == "<":
+                split = split_hypercube(
+                    hypercube,
+                    condition[0],
+                    condition[2]-1
+                )
+                destination_cubes.append(split[0])
+                origin_cubes.append(split[1])
+            else:
+                raise ValueError(f"condition {condition} not understood")
 
-            split = split_intervals(
-                parts_in_workflow[condition[0]],
-                condition[2]-1
-            )
-
-            to_map[condition[0]] = split[0]
-            keep_map[condition[0]] = split[1]
-        else:
-            raise ValueError(f"condition {condition} not understood")
-
-        if keep_map is not None:
-            parts_map[workflow] = keep_map
+        if len(origin_cubes) > 0:
+            parts_map[workflow] = origin_cubes
         else:
             parts_map.pop(workflow)
 
-        # This isn't correct: want only the intersection. This not being
-        # correctly fundamentally blows open my approach
-        parts_map[destination] = {
-            key: merge_intervals(
-                parts_map.get(destination, {}).get(key, []),
-                to_map.get(key, [])
-            )
-            for key in "xmas"
-        }
+        parts_map[destination] = parts_map.get(destination, []) + destination_cubes
 
     return parts_map
 
@@ -136,12 +126,12 @@ def get_part_value(part):
 
 
 def part_two(workflow_map):
-    parts_map = {"in": {
-        "x": [(1, 4000)],
-        "m": [(1, 4000)],
-        "a": [(1, 4000)],
-        "s": [(1, 4000)],
-    }}
+    parts_map = {"in": [{
+        "x": (1, 4000),
+        "m": (1, 4000),
+        "a": (1, 4000),
+        "s": (1, 4000),
+    }]}
 
     while True:
         try:
@@ -152,6 +142,21 @@ def part_two(workflow_map):
 
     return parts_map
 
+
+def get_hypercube_value(hypercube):
+    total = 1
+    for value in hypercube.values():
+        total *= value[1] - value[0] + 1
+
+    return total
+
+
+def get_all_hypercube_values(hypercubes):
+    total = 0
+    for hypercube in hypercubes:
+        total += get_hypercube_value(hypercube)
+
+    return total
 
 def split_intervals(intervals, split_at):
     # intervals: list of tuples(min, max), assumed ordered
@@ -169,6 +174,24 @@ def split_intervals(intervals, split_at):
             rhs.append((split_at+1, right))
 
     return lhs, rhs
+
+
+def split_hypercube(hypercube, key, split_at):
+    to_split = hypercube[key]
+    lhs, rhs = split_intervals([to_split], split_at)
+    if len(lhs) == 0:
+        left_hand_cube = None
+    else:
+        left_hand_cube = copy(hypercube)
+        left_hand_cube[key] = lhs[0]
+
+    if len(rhs) == 0:
+        right_hand_cube = None
+    else:
+        right_hand_cube = copy(hypercube)
+        right_hand_cube[key] = rhs[0]
+
+    return left_hand_cube, right_hand_cube
 
 
 def merge_intervals(intervals_a, intervals_b):
@@ -217,8 +240,8 @@ hdj{m>838:A,pv}
 {x=2461,m=1339,a=466,s=291}
 {x=2127,m=1623,a=2188,s=1013}"""
 
-    workflow_map, parts = parse_input(demo_text)
+    workflow_map, parts = parse_input(text)
     common.part(1, part_one(workflow_map, parts))
 
     shuffled = part_two(workflow_map)
-
+    common.part(2, get_all_hypercube_values(shuffled["A"]))
