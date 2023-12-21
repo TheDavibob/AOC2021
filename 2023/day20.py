@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import common
@@ -140,6 +141,7 @@ def push_button(nodes: list[Node]):
     except StopIteration:
         receiver = None
     low_received = False
+    switch_flicked = None
 
     for destination in broadcaster.out_connections:
         packet_queue.append(
@@ -158,7 +160,14 @@ def push_button(nodes: list[Node]):
         if (next_packet.destination is receiver) and (next_packet.type == 0):
             low_received = True
 
-    return nodes, n_low_packets, n_high_packets, low_received
+        if (next_packet.destination.name == "jm"):
+            if any(next_packet.destination.state):
+                switch_flicked = next(
+                    i for i, s in enumerate(next_packet.destination.state) if s
+                )
+
+
+    return nodes, n_low_packets, n_high_packets, low_received, switch_flicked
 
 
 def part_one(text):
@@ -168,7 +177,7 @@ def part_one(text):
     total_high = 0
 
     for _ in range(1000):
-        nodes, n_low, n_high, _ = push_button(nodes)
+        nodes, n_low, n_high, _, _ = push_button(nodes)
         total_low += n_low
         total_high += n_high
 
@@ -181,11 +190,41 @@ def part_two(text):
     n_buttons = 0
 
     low_received = False
+    switch_flicking = {i: [] for i in range(4)}
+
+    delta_dict = {i: None for i in range(4)}
+
     while not low_received:
-        nodes, _, _, low_received = push_button(nodes)
+        nodes, _, _, low_received, switch_flicked = push_button(nodes)
         n_buttons += 1
 
-    return n_buttons
+        if switch_flicked is not None:
+            switch_flicking[switch_flicked].append(n_buttons)
+
+            if len(switch_flicking[switch_flicked]) >= 2:
+                delta = (
+                    switch_flicking[switch_flicked][-1]
+                    - switch_flicking[switch_flicked][-2]
+                )
+            else:
+                delta = 0
+
+            if delta > 0:
+                delta_dict[switch_flicked] = delta
+
+        if all(delta_dict.values()):
+            break
+
+    # This keeps a track of the periodicity of the thing which submits to rx,
+    # with rx only triggered when they are all 1.
+    print(delta_dict)
+
+    lcm = 1
+    for p in delta_dict.values():
+        # Again, the problem is set nicely.
+        lcm = math.lcm(lcm, p)
+
+    return lcm
 
 
 if __name__ == "__main__":
