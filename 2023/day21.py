@@ -29,154 +29,113 @@ def part_one(input_grid, n_steps=64):
     for _ in range(n_steps):
         positions = step(positions, wall_grid)
 
-    # plt.matshow(positions)
-    # plt.show()
-
     return np.sum(positions)
 
 
-def part_two(input_grid):
-    reps = 4
-    part_two_grid = np.tile(input_grid == 1, (2*reps+1, 2*reps+1)).astype(int)
-    part_two_grid[65 + reps * input_grid.shape[0], 65 + reps * input_grid.shape[1]] = 2
 
-    positions = (part_two_grid == 2)
-    wall_grid = (part_two_grid == 1)
+def part_two_again(input_grid, N):
 
-    positions_at_steps = []
-    positions_at_steps.append(1)
-    for _ in range(part_two_grid.shape[0] // 2):
-        positions = step(positions, wall_grid)
-        positions_at_steps.append(np.sum(positions))
-    return positions_at_steps
+    full_cycles = N // 131
+    complete_cells_in_row = full_cycles - 1
+    n_same_parity_in_row = (complete_cells_in_row+1) // 2
 
+    n_same_parity_total = n_same_parity_in_row ** 2
+    n_complete_total = complete_cells_in_row * (complete_cells_in_row + 1) // 2
+    n_alt_parity_total = n_complete_total - n_same_parity_total
 
-def step_input_grid_from_cell(grid, cell):
-    wall_grid = (grid == 1)
+    mostly_complete_remainder = 131 + (N % 131)
+    mostly_incomplete_remainder = (N % 131)
 
-    positions = np.zeros_like(wall_grid)
-    positions[cell] = 2
+    total_mostly_complete = full_cycles
+    total_mostly_incomplete = full_cycles + 1
 
-    positions_at_steps = []
+    bottom_right = np.vstack((input_grid[65:], input_grid[:65]))
+    bottom_right = np.hstack((
+        bottom_right[:, 65:],
+        bottom_right[:, :65])
+    )
 
-    for i in range(sum(grid.shape)+2):
-        positions = step(positions, wall_grid)
-        positions_at_steps.append(np.sum(positions))
+    bottom_left = np.vstack((input_grid[65:], input_grid[:65]))
+    bottom_left = np.hstack((
+        bottom_left[:, 66:],
+        bottom_left[:, :66])
+    )
+    bottom_left = bottom_left[:, ::-1]
 
-    return positions_at_steps
+    upper_left = np.vstack((input_grid[66:], input_grid[:66]))
+    upper_left = np.hstack((
+        upper_left[:, 66:],
+        upper_left[:, :66])
+    )
+    upper_left = upper_left[::-1, ::-1]
+
+    upper_right = np.vstack((input_grid[66:], input_grid[:66]))
+    upper_right = np.hstack((
+        upper_right[:, 65:],
+        upper_right[:, :65])
+    )
+    upper_right = upper_right[::-1, :]
+
+    each_grid = (
+        bottom_right,
+        bottom_left,
+        upper_left,
+        upper_right
+    )
+
+    total = 0
+    for corner in each_grid:
+        fourfold = np.tile(corner==1, (2, 2)).astype(int)
+        fourfold[(0, 0)] = 2
+
+        positions = (fourfold == 2)
+        wall_grid = (fourfold == 1)
+        n_at = []
+        for _ in range(263):
+            n_at.append(np.sum((positions == 1)[:131, :131]))
+            positions = step(positions, wall_grid)
+
+        if N % 2 == 0:
+            same_parity = n_at[-1]
+            alt_parity = n_at[-2]
+        else:
+            same_parity = n_at[-2]
+            alt_parity = n_at[-1]
+
+        total += (
+                same_parity * n_same_parity_total
+                + alt_parity * n_alt_parity_total
+                + total_mostly_complete * n_at[mostly_complete_remainder]
+                + total_mostly_incomplete * n_at[mostly_incomplete_remainder]
+        )
+
+    # Double counted centre line
+    total -= (N + 1) * 4
+    if (N % 2) == 1:
+        total += 2 * (N+1)
+    else:
+        total += 2*N + 1
+
+    return total
 
 
 if __name__ == "__main__":
     input_grid = parse_input(common.import_file("input/day21"))
 
-    common.part(1, part_one(input_grid))
+    common.part(1, part_one(input_grid, n_steps=64))
 
-    # positions_at_steps = part_two(input_grid)
+    common.part(2, part_two_again(input_grid, 26501365))
 
-    demo_grid = parse_input("""...........
-.....###.#.
-.###.##..#.
-..#.#...#..
-....#.#....
-.##..S####.
-.##..#...#.
-.......##..
-.##.#.####.
-.##..##.##.
-...........""")
-    # print(part_one(demo_grid, 32))
-    # print(part_one(demo_grid, 33))
-
-    # Notes:
-    # Covered squares is approximately:
-    #   2*(n_steps - half_width) // width horizontally
-    #   2*(n_steps - half_height) // height vertically
-    #   0.5 * ((n_steps - half_width) // width - 1) * ((n_steps - half_height) //
-    #   height - 1) in each diagonal, of which there are four.
-    # These probably alternate odd/even
-    # For demo, we have:
-    # weight = (steps - 5) // 11
-    # (4*weight + 2*(weight-1)**2 ) * ((42 + 39)/2) is a good proxy
-    # (Even cells 42, odd cells 39)
-
-    # There should therefore be some sort of periodicity, but with this strange
-    # scaling
-
-    # input_grid = demo_grid
-
-    upper_left = step_input_grid_from_cell(input_grid, (0, 0))
-    upper_right = step_input_grid_from_cell(input_grid, (0, -1))
-    lower_left = step_input_grid_from_cell(input_grid, (-1, 0))
-    lower_right = step_input_grid_from_cell(input_grid, (-1, -1))
-
-    centre_point = input_grid.shape[0] // 2
-
-    centre_left = step_input_grid_from_cell(input_grid, (centre_point, 0))
-    centre_right = step_input_grid_from_cell(input_grid, (centre_point, -1))
-    centre_up = step_input_grid_from_cell(input_grid, (-1, centre_point))
-    centre_down = step_input_grid_from_cell(input_grid, (0, centre_point))
-
-    centre = step_input_grid_from_cell(input_grid, (centre_point, centre_point))
-
-    known_values = part_two(input_grid)
-
-    # The following works for N up to around 190 but not 200.
-    print(known_values[210])
-
-    N = 210
-    line_blocks = (N - centre_point) // input_grid.shape[0]
-    rem = (N-centre_point) % input_grid.shape[0] - 2
-
-    score = 0
-    if N % 2 == 0:
-        odd_blocks = line_blocks // 2
-        even_blocks = line_blocks - odd_blocks
-
-    else:
-        even_blocks = line_blocks // 2
-        odd_blocks = line_blocks - even_blocks
-
-    # NO: Next one started doesn't mean this one is finished
-    score += 4 * centre_left[-1] * even_blocks + 4 * centre_left[-2] * odd_blocks
-
-    score += centre_left[rem] + centre_down[rem] + centre_up[rem] + centre_right[rem]
-
-    if N % 2 == 0:
-        score += centre[-1]
-    else:
-        score += centre[-2]
-
-    completed_diag_block_line = (N - 2*centre_point) // input_grid.shape[0]
-    rem_diag_blocks = (N - 2*centre_point) % input_grid.shape[0] - 3
-
-    if completed_diag_block_line < 0:
-        completed_diag_block_line = 0
-        rem_diag_blocks = 0
-
-    total_completed_diag_blocks = completed_diag_block_line * (completed_diag_block_line - 1) // 2
-    if N % 2 == 0:
-        even_diag_blocks = (completed_diag_block_line + 1) // 2
-        odd_diag_blocks = total_completed_diag_blocks - even_diag_blocks
-    else:
-        odd_diag_blocks = (completed_diag_block_line + 1) // 2
-        even_diag_blocks = total_completed_diag_blocks - odd_diag_blocks
-
-    score += 4 * odd_diag_blocks * lower_left[-1] + 4 * even_diag_blocks * lower_left[-2]
-
-    remaining_diagonal_blocks = completed_diag_block_line + 1
-    score += remaining_diagonal_blocks * (
-            lower_left[rem_diag_blocks]
-            + lower_right[rem_diag_blocks]
-            + upper_left[rem_diag_blocks]
-            + upper_right[rem_diag_blocks])
-
-    print(score)
-
-    reps = 2
-    part_two_grid = np.tile(input_grid == 1, (2*reps+1, 2*reps+1)).astype(int)
-    part_two_grid[65 + reps * input_grid.shape[0], 65 + reps * input_grid.shape[1]] = 2
-
-    positions = (part_two_grid == 2)
-    wall_grid = (part_two_grid == 1)
-    for _ in range(N):
-        positions = step(positions, wall_grid)
+    # Below: demo that part 2 works.
+    # twentyfivefold = np.tile(input_grid == 1, (5, 5)).astype(int)
+    # twentyfivefold[2*131+65, 2*131+65] = 2
+    #
+    # positions = (twentyfivefold == 2)
+    # wall_grid = (twentyfivefold == 1)
+    #
+    # for N in range(120):
+    #     positions = step(positions, wall_grid)
+    #
+    # for N in range(120, 300):
+    #     print(N, np.sum(positions==1), part_two_again(input_grid, N))
+    #     positions = step(positions, wall_grid)
