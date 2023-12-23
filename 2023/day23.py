@@ -145,6 +145,37 @@ def part_two(grid):
     common.part(2, longest_path(start_point, [], grid))
 
 
+def steps_in_direction(from_point, initial_direction, grid, targets):
+    to_point = from_point[0] + initial_direction[0], from_point[1] + initial_direction[1]
+
+    if grid[to_point]:
+        return None
+
+    n_steps = 1
+    if to_point in targets:
+        return n_steps, to_point
+
+    prev_direction = initial_direction
+
+    while True:
+        for next_direction in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+            if prev_direction[0] == -next_direction[0] and prev_direction[1] == -next_direction[1]:
+                continue
+
+            new_target = to_point[0] + next_direction[0], to_point[1] + next_direction[1]
+            if grid[new_target] == 0:
+                to_point = new_target
+                n_steps += 1
+                prev_direction = next_direction
+                break
+
+        if grid[new_target] != 0:
+            raise ValueError("Can't move")
+
+        if to_point in targets:
+            return n_steps, to_point
+
+
 if __name__ == "__main__":
     text = common.import_file("input/day23")
     test_text = """#.#####################
@@ -188,10 +219,14 @@ if __name__ == "__main__":
     end_point = (end_line, end_point[0][0])
     sources = [start_point, end_point]
 
-    d = find_node_to_node_distance(sources, threes, fours, grid)
+    # d = find_node_to_node_distance(sources, threes, fours, grid)
 
     # TODO:
     #  - Find pairwise difference between all "nodes", that is junctions. Probably only need the closest set of nodes.
     #  - This should be OK: for each node, go in a valid direction and follow until find another node. Nothing
     #    complicated needed.
     #  - Then do the recursion on this much reduced space of nodes->nodes and distances.
+
+    all_nodes = sources + threes + fours
+    for next_direction in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+        print(steps_in_direction(all_nodes[3], next_direction, grid==1, all_nodes))
