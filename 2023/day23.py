@@ -65,6 +65,8 @@ def find_branch_points(grid):
     for i_row in range(1, grid.shape[0]-1):
         for i_col in range(1, grid.shape[1]-1):
             from_point = (i_row, i_col)
+            if grid[from_point] == 1:
+                continue
             neighbours = 0
             for test_dir in [(0, 1), (1, 0), (-1, 0), (0, -1)]:
                 test_point = (from_point[0] + test_dir[0], from_point[1] + test_dir[1])
@@ -79,70 +81,45 @@ def find_branch_points(grid):
     return three_ways, four_ways
 
 
-def find_node_to_node_distance(sources, three_points, four_points, grid):
-    all_nodes = sources + three_points + four_points
-    distance_array = -1 * np.ones((len(all_nodes), len(all_nodes)), dtype=int)
-
-    filled_grid = (grid == 1).astype(int)
-    for node in all_nodes:
-        filled_grid[node] = 1
-
-    print("Threes:", len(three_points))
-    print("Fours:", len(four_points))
-
-    for i_from, from_node in tqdm(enumerate(three_points)):
-        if np.sum(distance_array[len(sources) + i_from] > 0) == 3:
-            continue
-        for i_to, to_node in enumerate(all_nodes):
-            if to_node == from_node:
-                continue
-            distance = find_pairwise_distance(from_node, to_node, filled_grid)
-            if distance is not None:
-                distance_array[len(sources) + i_from, i_to] = distance
-
-    for i_from, from_node in tqdm(enumerate(four_points)):
-        if np.sum(distance_array[len(sources) + len(three_points) + i_from] > 0) == 4:
-            continue
-        for i_to, to_node in enumerate(all_nodes):
-            if to_node == from_node:
-                continue
-            distance = find_pairwise_distance(from_node, to_node, filled_grid)
-            if distance is not None:
-                distance_array[len(sources) + len(three_points) + i_from, i_to] = distance
-
-    return distance_array
-
-
-def find_longest_path(distance_grid, current_node, nodes_visited, target_node):
-    # start at node 0, aiming for node 1
+def find_longest_path(graph_representation, current_node, nodes_visited, target_node, cache_dict):
     if current_node == target_node:
         return 0
 
-    target_nodes = np.where(distance_grid[0])
+    cached = cache_dict.get((current_node, tuple(sorted(nodes_visited))), "null")
+    if cached != "null":
+        return cached
 
+    best_distance = None
+    for neighbour, distance in graph_representation[current_node].items():
+        if neighbour in nodes_visited:
+            continue
+        distance_from_neighbour = find_longest_path(
+            graph_representation,
+            neighbour,
+            nodes_visited + [current_node],
+            target_node,
+            cache_dict
+        )
+        if distance_from_neighbour is not None:
+            if best_distance is None:
+                best_distance = distance_from_neighbour + distance
+            else:
+                best_distance = max(best_distance, distance_from_neighbour + distance)
 
-def find_pairwise_distance(from_point, to_point, filled_grid):
-    new_grid = filled_grid.copy()
-    new_grid[from_point] = 0
-    new_grid[to_point] = 0
-    distance = longest_path(from_point, [], new_grid, to_point)
-
-    return distance
-
+    cache_dict[(current_node, tuple(sorted(nodes_visited)))] = best_distance
+    return best_distance
 
 
 def part_one(grid):
     start_point = np.where(grid[0]==0)
     start_point = (0, start_point[0][0])
-    common.part(1, longest_path(start_point, [], grid))
+    return longest_path(start_point, [], grid)
 
 
 def part_two(grid):
-    grid = (grid == 1)
+    graph_network, sources = reduced_network(grid == 1)
+    return find_longest_path(graph_network, sources[0], [], sources[1], {})
 
-    start_point = np.where(grid[0]==0)
-    start_point = (0, start_point[0][0])
-    common.part(2, longest_path(start_point, [], grid))
 
 
 def steps_in_direction(from_point, initial_direction, grid, targets):
@@ -176,6 +153,38 @@ def steps_in_direction(from_point, initial_direction, grid, targets):
             return n_steps, to_point
 
 
+def reduced_network(grid):
+    threes, fours = find_branch_points(grid==1)
+
+    print("Found all nodes")
+
+    start_point = np.where(grid[0]==0)
+    start_point = (0, start_point[0][0])
+
+    end_line = grid.shape[0]-1
+    end_point = np.where(grid[end_line]==0)
+    end_point = (end_line, end_point[0][0])
+    sources = [start_point, end_point]
+
+    network_grid = {}
+    all_nodes = sources + threes + fours
+    for node in threes + fours:
+        node_connections = {}
+        for next_direction in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+            output = steps_in_direction(node, next_direction, grid == 1, all_nodes)
+            if output is not None:
+                node_connections[output[1]] = output[0]
+                if output[1] in sources:
+                    network_grid[output[1]] = {node: output[0]}
+
+        network_grid[node] = node_connections
+
+    print("Made network grid")
+
+    return network_grid, sources
+
+
+
 if __name__ == "__main__":
     text = common.import_file("input/day23")
     test_text = """#.#####################
@@ -205,28 +214,14 @@ if __name__ == "__main__":
     grid = parse_input(text)
     demo_grid = parse_input(test_text)
 
-    # part_one(grid)
-    # part_two(grid)
+    assert part_one(demo_grid) == 94
+    assert part_two(demo_grid) == 154
 
-    grid = demo_grid
-    threes, fours = find_branch_points(grid==1)
-
-    start_point = np.where(grid[0]==0)
-    start_point = (0, start_point[0][0])
-
-    end_line = grid.shape[0]-1
-    end_point = np.where(grid[end_line]==0)
-    end_point = (end_line, end_point[0][0])
-    sources = [start_point, end_point]
-
-    # d = find_node_to_node_distance(sources, threes, fours, grid)
+    # common.part(1, part_one(grid))
+    common.part(2, part_two(grid))
 
     # TODO:
     #  - Find pairwise difference between all "nodes", that is junctions. Probably only need the closest set of nodes.
     #  - This should be OK: for each node, go in a valid direction and follow until find another node. Nothing
     #    complicated needed.
     #  - Then do the recursion on this much reduced space of nodes->nodes and distances.
-
-    all_nodes = sources + threes + fours
-    for next_direction in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
-        print(steps_in_direction(all_nodes[3], next_direction, grid==1, all_nodes))
