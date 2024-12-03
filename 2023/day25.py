@@ -1,5 +1,7 @@
 import sys
-from copy import deepcopy
+
+import numpy as np
+import networkx as nx
 
 import common
 
@@ -48,74 +50,53 @@ def get_block_size(graph, current_point=None):
     return len(visited)
 
 
-def remove_connection(graph, from_con, to_con):
-    if to_con == from_con:
-        return graph
+def get_edges(graph):
+    nodes = list(graph.keys())
+    edge_array = np.zeros((len(nodes),)*2, dtype=bool)
 
-    if to_con not in graph[from_con]:
-        return graph
+    for node in nodes:
+        i_node = nodes.index(node)
+        connected_nodes = graph[node]
 
-    graph = deepcopy(graph)
-    graph[to_con].remove(from_con)
-    graph[from_con].remove(to_con)
+        for connection in connected_nodes:
+            i_connect = nodes.index(connection)
+            edge_array[i_node, i_connect] = True
+
+    return edge_array, nodes
+
+def remove_connection(graph, from_node, to_node):
+    graph[from_node].remove(to_node)
+    graph[to_node].remove(from_node)
+
+
+
+def make_graph(input_graph):
+    graph = nx.Graph()
+
+    nodes = list(input_graph.keys())
+    for node in nodes:
+        graph.add_node(nodes.index(node))
+        for connection in input_graph[node]:
+            graph.add_edge(nodes.index(node), nodes.index(connection))
+
     return graph
-
-
-def brute_force_part_one(graph):
-    for to_0 in graph.keys():
-        for from_0 in graph.keys():
-            print(f"{to_0}:{from_0}")
-            if to_0 == from_0:
-                continue
-
-            if to_0 not in graph[from_0]:
-                continue
-
-            red_0 = remove_connection(graph, to_0, from_0)
-            for to_1 in red_0.keys():
-                for from_1 in red_0.keys():
-                    print(f"\t{to_1}:{from_1}")
-                    if to_1 == from_1:
-                        continue
-
-                    if to_1 not in graph[from_1]:
-                        continue
-
-                    red_1 = remove_connection(graph, to_1, from_1)
-                    for to_2 in red_1.keys():
-                        for from_2 in red_1.keys():
-                            print(f"\t\t{to_2}:{from_2}")
-                            if to_2 == from_2:
-                                continue
-
-                            if to_2 not in graph[from_2]:
-                                continue
-
-                            red_2 = remove_connection(graph, to_2, from_2)
-
-                            if get_block_size(red_2) != len(red_2.keys()):
-                                return get_block_size(red_2)
-
-
-def path_counting(from_point, to_point, visited, graph):
-    if from_point == to_point:
-        return 1
-
-    head = graph[from_point]
-    count = 0
-    for point in head:
-        if point in visited:
-            continue
-
-        count += path_counting(point, to_point, visited + [from_point], graph)
-
-    return count
 
 
 if __name__ == "__main__":
     text = common.import_file("input/day25")
     graph = parse_input(text)
 
-    nodes = list(graph.keys())
-    path_counting(nodes[0], nodes[1], [], graph)
+    edges, nodes = get_edges(graph)
 
+    # nx_graph = make_graph(graph)
+    # nx.draw(nx_graph, with_labels=True)
+
+    remove_connection(graph, nodes[1376], nodes[1368])
+    remove_connection(graph, nodes[104], nodes[650])
+    remove_connection(graph, nodes[1289], nodes[379])
+
+    # nx_graph = make_graph(graph)
+    # nx.draw(nx_graph, with_labels=True)
+
+    block_size = get_block_size(graph)
+    common.part(1, block_size * (len(nodes) - block_size))
