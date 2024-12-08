@@ -35,7 +35,6 @@ def part_one(challenges):
     print(f"Part 1: {total}")
 
 
-
 def solve_part_two_challenge(challenge):
     target, components = challenge
     score_so_far = [components[0]]
