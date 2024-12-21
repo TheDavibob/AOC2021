@@ -118,6 +118,26 @@ def step(state, key_press):
     return state, output
 
 
+def make_layer_adj_map(position_map):
+    states = list(position_map.keys())
+    adjacency_map = {}
+    for state in states:
+        current_position = position_map[state]
+        neighbours = []
+        for direction in "^<v>":
+            direction_to_move = direction_map[direction]
+            new_position = tuple(c + d for c, d in zip(current_position, direction_to_move))
+            try:
+                new_state = next(k for k, v in position_map.items() if v == new_position)
+                neighbours.append(new_state)
+            except StopIteration:
+                pass
+        adjacency_map[state] = neighbours
+
+    return adjacency_map
+
+
+
 def make_adjacency_map(n_levels):
     # Output only written in state (output, A, A) so it's fundamentally just finding all the paths that do this
     # traversal
@@ -208,6 +228,68 @@ def run(sequences, n_levels=2):
     return total_val
 
 
+def find_paths(from_state, to_state, adjacency_map, position_map):
+    paths = [(from_state,)]
+    completed_paths = []
+    while len(paths) > 0:
+        new_paths = []
+        for path in paths:
+            head = path[-1]
+            neighbours = adjacency_map[head]
+            for neighbour in neighbours:
+                if neighbour == to_state:
+                    completed_paths.append(path + (neighbour,))
+                elif neighbour in path:
+                    continue
+                else:
+                    new_paths.append(path + (neighbour,))
+
+        paths = new_paths
+
+    completed_as_directions = []
+    for path in completed_paths:
+        as_directions = ""
+        for s_f, s_t in zip(path[:-1], path[1:]):
+            pos_f = position_map[s_f]
+            pos_t = position_map[s_t]
+            pos_delta = tuple(x - y for x, y in zip(pos_t, pos_f))
+            direction = next(k for k, v in direction_map.items() if v==pos_delta)
+            as_directions += direction
+        completed_as_directions.append(as_directions)
+    return completed_as_directions
+
+
+def find_all_paths(position_map):
+    adjacency_map = make_layer_adj_map(position_map)
+    states = list(adjacency_map.keys())
+    paths = {}
+    for s_f in states:
+        for s_t in states:
+            if s_t == s_f:
+                paths[(s_f, s_t)] = [""]
+            else:
+                paths[(s_f, s_t)] = find_paths(s_f, s_t, adjacency_map, position_map)
+
+    return paths
+
+
+def find_best_paths(paths, cost_lookup):
+    # The layer above defines the cost of each movement. Use this to find the cost of each path
+    paths_cost = {}
+    for state_pair, each_paths in paths.items():
+        best_cost = None
+        for path in each_paths:
+            cost = 0
+            for s_f, s_t in zip("A" + path, path + "A"):
+                cost += cost_lookup[(s_f, s_t)]
+            if best_cost is None:
+                best_cost = cost
+            elif cost < best_cost:
+                best_cost = cost
+        paths_cost[state_pair] = best_cost
+    return paths_cost
+
+
 if __name__ == "__main__":
     # test input
 #     text = """029A
@@ -223,7 +305,8 @@ if __name__ == "__main__":
 579A"""
 
     sequences = text.split("\n")
-    total_val = run(sequences)
+    # total_val = run(sequences)
+    # print(f"Part 1: {total_val}")
 
     # sequence = "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A"
     # state = ("A", "A", "A")
@@ -232,5 +315,22 @@ if __name__ == "__main__":
     #     print(state)
     #     if output is not None:
     #         print(output)
+    paths_1 = find_all_paths(position_map_1)
+    paths_0 = find_all_paths(position_map_0)
 
-    print(f"Part 1: {total_val}")
+    upper_cost_lookup = {(x, y): 1 for x in "^<v>A" for y in "^>v<A"}
+    next_cost_lookup = upper_cost_lookup
+    n_layers = 25
+    for _ in range(n_layers):
+        next_cost_lookup = find_best_paths(paths_1, next_cost_lookup)
+
+    final_cost_lookup = find_best_paths(paths_0, next_cost_lookup)
+    total_val = 0
+    for path in sequences:
+        cost = -1  # Ignore the first A
+        for s_f, s_t in zip("A" + path, path + "A"):
+            cost += final_cost_lookup[(s_f, s_t)]
+        val = cost*int(path[:-1])
+        print(cost, int(path[:-1]), val)
+        total_val += val
+    print(f"Part 2: {total_val}")  # Part 1 can do this to with n_iterations = 2
