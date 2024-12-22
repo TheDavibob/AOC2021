@@ -60,7 +60,18 @@ def find_sequences(diffs):
                 sequences.append(sequence)
                 print(len(sequences))
 
-    return seqeuences
+    return sequences
+
+
+def calc_all_scoring_sequences(nums, diffs):
+    vals = {}
+    for i in range(0, len(diffs)-4):
+        sequence = tuple(diffs[i:i+4])
+        if sequence not in vals:
+            vals[sequence] = nums[i+4]
+
+    return vals
+
 
 if __name__ == "__main__":
     with open("input/day22") as file:
@@ -74,6 +85,11 @@ if __name__ == "__main__":
     #
     # print(f"Part 1: {total}")
 
+#     text = """1
+# 2
+# 3
+# 2024"""
+
     numbers = []
     differences = []
     for line in text.split("\n"):
@@ -85,27 +101,50 @@ if __name__ == "__main__":
 
     # seqeuences = find_sequences(differences)
 
-    best_banan = 0
-    for sequence in product(*4*[list(range(-9, 10))]):
-        valid_sequence = True
-        s_total = 0
-        for s in sequence:
-            s_total += s
-            if s_total >= 10:
-                valid_sequence = False
-                break
-            if s_total <= -10:
-                valid_sequence = False
-                break
+    # best_banan = 0
+    # for sequence in product(*4*[list(range(-9, 10))]):
+    #     valid_sequence = True
+    #     s_total = 0
+    #     for s in sequence:
+    #         s_total += s
+    #         if s_total >= 10:
+    #             valid_sequence = False
+    #             break
+    #         if s_total <= -10:
+    #             valid_sequence = False
+    #             break
+    #
+    #     if not valid_sequence:
+    #         continue
+    #
+    #     tv = 0
+    #     for n, d in zip(numbers, differences):
+    #         tv += calc_value(n, d, sequence)
+    #
+    #     if tv > best_banan:
+    #         best_banan = tv
+    #
+    #     print(sequence, best_banan, tv)
 
-        if not valid_sequence:
-            continue
+    vals = []
+    for n, d in tqdm(zip(numbers, differences)):
+        vals.append(calc_all_scoring_sequences(n, d))
 
-        tv = 0
-        for n, d in zip(numbers, differences):
-            tv += calc_value(n, d, sequence)
+    all_sequences = set()
+    for v in tqdm(vals):
+        all_sequences = all_sequences.union(v.keys())
 
-        if tv > best_banan:
-            best_banan = tv
+    best_score = 0
+    sequence_score = {}
+    for sequence in tqdm(all_sequences):
+        score = 0
+        for v in vals:
+            if sequence in v:
+                score += v[sequence]
 
-        print(sequence, best_banan, tv)
+        if score > best_score:
+            best_score = score
+        print(sequence, best_score, score)
+        sequence_score[sequence] = score
+
+    # 2176 is too low
