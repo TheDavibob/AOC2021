@@ -52,11 +52,15 @@ print(f"Part 1: {len([n for n in all_nums if n == 0])}")
 def step_click(num, command):
     click = 0
     if command[0] == "L":
-        num -= int(command[1:])
+        num *= -1
+        num %= 100
+        num += int(command[1:])
 
-        if num <= 0:
-            click -= (num // 100)
-            num %= 100
+        if num >= 100:
+            click += (num // 100)
+
+        num *= -1
+        num %= 100
 
     elif command[0] == "R":
         num += int(command[1:])
@@ -79,6 +83,6 @@ for command in commands:
 print(f"Part 2: {all_clicks}")
 
 # Debugging
-print(step_click(0, "L1000"))
+print(step_click(99, "L1000"))
 #
 # print(int(0x434C49434B))
