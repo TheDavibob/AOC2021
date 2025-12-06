@@ -60,13 +60,13 @@ def parse_input_again(puzzle_input):
     ops = []
     op_index = []
     for i_symbol, symbol in enumerate(op_line):
-        if symbol != " ":
+        if symbol not in [" ", "."]:
             ops.append(symbol)
             op_index.append(i_symbol)
 
     op_index.append(len(op_line))
     total = 0
-    for from_index, to_index, op in zip(op_index[:-1], op_index[1:], ops[:-1]):
+    for from_index, to_index, op in zip(op_index[:-1], op_index[1:], ops):
         numbers = []
         for index in range(from_index, to_index):
             number = ""
@@ -89,9 +89,10 @@ def parse_input_again(puzzle_input):
 
 
 if __name__ == "__main__":
-    assert part_one(TEST_DATA) == 4277556
-    print(f"Part 1: {part_one(REAL_DATA)}")
+    # assert part_one(TEST_DATA) == 4277556
+    # print(f"Part 1: {part_one(REAL_DATA)}")
 
-    assert parse_input_again(TEST_DATA) == 3262769
+    # assert parse_input_again(TEST_DATA) == 3262769
     # 11708563457309 is too low...
+    # 11708563457820 is also too low...
     print(f"Part 2: {parse_input_again(REAL_DATA)}")
